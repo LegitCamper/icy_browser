@@ -1,3 +1,7 @@
+use iced::event::Status;
+use iced::keyboard;
+use iced::mouse;
+
 #[allow(unused)]
 pub trait BrowserEngine {
     fn new(width: u32, height: u32) -> Self;
@@ -18,9 +22,9 @@ pub trait BrowserEngine {
     fn go_forward(&self);
     fn go_back(&self);
 
-    fn scroll(&self, delta: iced::mouse::ScrollDelta) -> iced::event::Status;
-    fn handle_keyboard_event(&self, event: iced::keyboard::Event) -> iced::event::Status;
-    fn handle_mouse_event(&mut self, event: iced::mouse::Event) -> iced::event::Status;
+    fn scroll(&self, delta: iced::mouse::ScrollDelta) -> Status;
+    fn handle_keyboard_event(&self, event: keyboard::Event) -> Status;
+    fn handle_mouse_event(&mut self, event: mouse::Event) -> Status;
 }
 
 #[cfg(feature = "webkit")]
@@ -28,7 +32,11 @@ pub trait BrowserEngine {
 pub mod ultralight {
     use std::collections::HashMap;
 
-    use iced::mouse::ScrollDelta;
+    use iced::event::Status;
+    use iced::keyboard::{self};
+    use iced::mouse::{self, ScrollDelta};
+    use iced::Point;
+
     use ul_next::{
         config::Config,
         event::{MouseEvent, ScrollEvent},
@@ -57,7 +65,7 @@ pub mod ultralight {
         view_config: ViewConfig,
         width: u32,
         height: u32,
-        mouse_loc: Option<iced::Point>,
+        mouse_loc: Option<Point>,
         current_tab: Option<String>,
         tabs: HashMap<String, Tab>,
     }
@@ -216,7 +224,7 @@ pub mod ultralight {
                 .go_back();
         }
 
-        fn scroll(&self, delta: ScrollDelta) -> iced::event::Status {
+        fn scroll(&self, delta: ScrollDelta) -> Status {
             let scroll_event = match delta {
                 ScrollDelta::Lines { x, y } => ScrollEvent::new(
                     ul_next::event::ScrollEventType::ScrollByPage,
@@ -236,53 +244,37 @@ pub mod ultralight {
                 .unwrap()
                 .view
                 .fire_scroll_event(scroll_event);
-            iced::event::Status::Captured
+            Status::Captured
         }
 
-        fn handle_keyboard_event(&self, event: iced::keyboard::Event) -> iced::event::Status {
+        fn handle_keyboard_event(&self, event: keyboard::Event) -> Status {
             match event {
-                iced::keyboard::Event::KeyPressed {
+                keyboard::Event::KeyPressed {
                     key,
                     location,
                     modifiers,
                     text,
-                } => iced::event::Status::Ignored,
-                iced::keyboard::Event::KeyReleased {
+                } => Status::Ignored,
+                keyboard::Event::KeyReleased {
                     key,
                     location,
                     modifiers,
-                } => iced::event::Status::Ignored,
-                iced::keyboard::Event::ModifiersChanged(_) => iced::event::Status::Ignored,
+                } => Status::Ignored,
+                keyboard::Event::ModifiersChanged(_) => Status::Ignored,
             }
         }
 
-        fn handle_mouse_event(&mut self, event: iced::mouse::Event) -> iced::event::Status {
+        fn handle_mouse_event(&mut self, event: mouse::Event) -> Status {
             match event {
-                iced::mouse::Event::ButtonPressed(iced::mouse::Button::Other(_)) => {
-                    iced::event::Status::Ignored
-                }
-                iced::mouse::Event::ButtonReleased(iced::mouse::Button::Other(_)) => {
-                    iced::event::Status::Ignored
-                }
-                iced::mouse::Event::ButtonPressed(iced::mouse::Button::Middle) => {
-                    iced::event::Status::Ignored
-                }
-                iced::mouse::Event::ButtonReleased(iced::mouse::Button::Middle) => {
-                    iced::event::Status::Ignored
-                }
-                iced::mouse::Event::ButtonPressed(iced::mouse::Button::Forward) => {
-                    iced::event::Status::Ignored
-                }
-                iced::mouse::Event::ButtonReleased(iced::mouse::Button::Forward) => {
-                    iced::event::Status::Ignored
-                }
-                iced::mouse::Event::ButtonPressed(iced::mouse::Button::Back) => {
-                    iced::event::Status::Ignored
-                }
-                iced::mouse::Event::ButtonReleased(iced::mouse::Button::Back) => {
-                    iced::event::Status::Ignored
-                }
-                iced::mouse::Event::ButtonPressed(iced::mouse::Button::Left) => {
+                mouse::Event::ButtonPressed(mouse::Button::Other(_)) => Status::Ignored,
+                mouse::Event::ButtonReleased(mouse::Button::Other(_)) => Status::Ignored,
+                mouse::Event::ButtonPressed(mouse::Button::Middle) => Status::Ignored,
+                mouse::Event::ButtonReleased(mouse::Button::Middle) => Status::Ignored,
+                mouse::Event::ButtonPressed(mouse::Button::Forward) => Status::Ignored,
+                mouse::Event::ButtonReleased(mouse::Button::Forward) => Status::Ignored,
+                mouse::Event::ButtonPressed(mouse::Button::Back) => Status::Ignored,
+                mouse::Event::ButtonReleased(mouse::Button::Back) => Status::Ignored,
+                mouse::Event::ButtonPressed(mouse::Button::Left) => {
                     if let Some(mouse_loc) = self.mouse_loc {
                         self.tabs
                             .get(&self.current_tab.to_owned().unwrap())
@@ -297,12 +289,12 @@ pub mod ultralight {
                                 )
                                 .unwrap(),
                             );
-                        iced::event::Status::Captured
+                        Status::Captured
                     } else {
-                        iced::event::Status::Ignored
+                        Status::Ignored
                     }
                 }
-                iced::mouse::Event::ButtonReleased(iced::mouse::Button::Left) => {
+                mouse::Event::ButtonReleased(mouse::Button::Left) => {
                     if let Some(mouse_loc) = self.mouse_loc {
                         self.tabs
                             .get(&self.current_tab.to_owned().unwrap())
@@ -317,12 +309,12 @@ pub mod ultralight {
                                 )
                                 .unwrap(),
                             );
-                        iced::event::Status::Captured
+                        Status::Captured
                     } else {
-                        iced::event::Status::Ignored
+                        Status::Ignored
                     }
                 }
-                iced::mouse::Event::ButtonPressed(iced::mouse::Button::Right) => {
+                mouse::Event::ButtonPressed(mouse::Button::Right) => {
                     if let Some(mouse_loc) = self.mouse_loc {
                         self.tabs
                             .get(&self.current_tab.to_owned().unwrap())
@@ -337,12 +329,12 @@ pub mod ultralight {
                                 )
                                 .unwrap(),
                             );
-                        iced::event::Status::Captured
+                        Status::Captured
                     } else {
-                        iced::event::Status::Ignored
+                        Status::Ignored
                     }
                 }
-                iced::mouse::Event::ButtonReleased(iced::mouse::Button::Right) => {
+                mouse::Event::ButtonReleased(mouse::Button::Right) => {
                     if let Some(mouse_loc) = self.mouse_loc {
                         self.tabs
                             .get(&self.current_tab.to_owned().unwrap())
@@ -357,12 +349,12 @@ pub mod ultralight {
                                 )
                                 .unwrap(),
                             );
-                        iced::event::Status::Captured
+                        Status::Captured
                     } else {
-                        iced::event::Status::Ignored
+                        Status::Ignored
                     }
                 }
-                iced::mouse::Event::CursorMoved { position } => {
+                mouse::Event::CursorMoved { position } => {
                     self.mouse_loc = Some(position);
                     self.tabs
                         .get(&self.current_tab.to_owned().unwrap())
@@ -377,13 +369,13 @@ pub mod ultralight {
                             )
                             .unwrap(),
                         );
-                    iced::event::Status::Captured
+                    Status::Captured
                 }
-                iced::mouse::Event::WheelScrolled { delta } => self.scroll(delta),
+                mouse::Event::WheelScrolled { delta } => self.scroll(delta),
                 // cursur left browser view
-                iced::mouse::Event::CursorLeft => iced::event::Status::Ignored,
+                mouse::Event::CursorLeft => Status::Ignored,
                 // cursur entered browser view
-                iced::mouse::Event::CursorEntered => iced::event::Status::Ignored,
+                mouse::Event::CursorEntered => Status::Ignored,
             }
         }
     }

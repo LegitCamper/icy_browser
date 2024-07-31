@@ -10,14 +10,13 @@ use iced::{
         widget::Tree,
         Clipboard, Layout, Shell, Widget,
     },
-    alignment::{Horizontal, Vertical},
     theme::Theme,
     widget::{
-        button, component, container,
+        component, container,
         image::{Handle, Image},
         row, text,
         text::LineHeight,
-        Button, Component, Row, Space,
+        Button, Component, Space,
     },
     Element, Event, Length, Rectangle, Size,
 };
