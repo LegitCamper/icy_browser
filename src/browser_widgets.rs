@@ -216,7 +216,10 @@ pub mod browser_view {
 
             state.webengine.render();
             let handle = match state.webengine.pixel_buffer() {
-                Some(image) => Handle::from_pixels(w, h, image),
+                Some(image) => {
+                    let image = bgr_to_rgb(image);
+                    Handle::from_pixels(w, h, image)
+                }
                 None => {
                     let palatte = theme.palette().background;
                     let mut image: Vec<u8> = Vec::new();
@@ -296,5 +299,13 @@ pub mod browser_view {
         fn from(widget: BrowserView) -> Self {
             Self::new(widget)
         }
+    }
+
+    fn bgr_to_rgb(image: Vec<u8>) -> Vec<u8> {
+        image
+            .chunks(4)
+            .map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
+            .flatten()
+            .collect()
     }
 }
