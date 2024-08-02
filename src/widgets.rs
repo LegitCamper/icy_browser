@@ -1,31 +1,13 @@
-use crate::browser_engines::{self, BrowserEngine};
+use crate::engines::{self, BrowserEngine};
 #[cfg(feature = "webkit")]
-use browser_engines::ultralight::Ultralight;
+use engines::ultralight::Ultralight;
 
-use iced::{
-    advanced::{
-        graphics::core::event,
-        layout, mouse,
-        renderer::{self},
-        widget::Tree,
-        Clipboard, Layout, Shell, Widget,
-    },
-    theme::Theme,
-    widget::{
-        component, container,
-        image::{Handle, Image},
-        row, text,
-        text::LineHeight,
-        Button, Component, Space,
-    },
-    Element, Event, Length, Rectangle, Size,
-};
 use std::sync::{Arc, Mutex};
 
 // Configures the Browser Widget
 #[derive(Debug, Clone)]
 pub struct Config {
-    start_page: String,
+    pub start_page: String,
 }
 
 impl Default for Config {
@@ -37,14 +19,22 @@ impl Default for Config {
 }
 
 // Holds the State of the Browser Widgets
-pub struct State {
-    config: Config,
+pub struct State(pub Arc<Mutex<StateGuard>>);
+
+impl Clone for State {
+    fn clone(&self) -> State {
+        State(self.0.clone())
+    }
+}
+
+pub struct StateGuard {
+    pub config: Config,
     #[cfg(feature = "webkit")]
-    webengine: Ultralight,
+    pub webengine: Ultralight,
 }
 
 impl State {
-    pub fn new() -> Arc<Mutex<Self>> {
+    pub fn new() -> Self {
         #[cfg(feature = "webkit")]
         // size does not matter since it is resized to fit window
         let mut webengine = Ultralight::new(1600, 1600);
@@ -52,19 +42,25 @@ impl State {
         let config = Config::default();
         webengine.new_tab(&config.start_page);
 
-        Arc::new(Mutex::new(Self { config, webengine }))
+        Self(Arc::new(Mutex::new(StateGuard { config, webengine })))
     }
 
     pub fn do_work(&self) {
-        self.webengine.do_work()
+        self.0.lock().unwrap().webengine.do_work()
     }
 }
 
 pub use nav_bar::nav_bar;
 pub mod nav_bar {
-    use iced::widget::text_input;
 
-    use super::*;
+    use super::{BrowserEngine, State};
+
+    use iced::widget::text_input;
+    use iced::{
+        theme::Theme,
+        widget::{component, container, row, text, text::LineHeight, Button, Component, Space},
+        Element, Length, Size,
+    };
 
     #[derive(Debug, Clone)]
     pub enum Event {
@@ -72,22 +68,27 @@ pub mod nav_bar {
         Forward,
         Refresh,
         Home,
-        UrlEdited(String),
         UrlChanged(String),
+        UrlPasted(String),
+        UrlSubmitted,
     }
 
     // helper function to create navigation bar
-    pub fn nav_bar(state: Arc<Mutex<State>>) -> NavBar {
+    pub fn nav_bar(state: &State) -> Option<NavBar> {
         NavBar::new(state)
     }
 
     // Simple navigation bar widget
-    pub struct NavBar(Arc<Mutex<State>>, String);
+    pub struct NavBar {
+        state: State,
+        url: String,
+    }
 
     impl NavBar {
-        pub fn new(state: Arc<Mutex<State>>) -> Self {
-            let url = state.lock().unwrap().config.start_page.clone();
-            Self(state, url)
+        pub fn new(state: &State) -> Option<Self> {
+            let state = state.clone();
+            let url = state.0.lock().ok()?.config.start_page.clone();
+            Some(Self { state, url })
         }
     }
 
@@ -96,43 +97,43 @@ pub mod nav_bar {
         type Event = Event;
 
         fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
+            let state = self.state.0.lock().ok()?;
+
             match event {
-                Event::Backward => self.0.lock().unwrap().webengine.go_back(),
-                Event::Forward => self.0.lock().unwrap().webengine.go_forward(),
-                Event::Refresh => self.0.lock().unwrap().webengine.refresh(),
-                Event::Home => {
-                    let start_page = self.0.lock().unwrap().config.start_page.clone();
-                    self.0.lock().unwrap().webengine.goto_url(&start_page)
+                Event::Backward => state.webengine.go_back(),
+                Event::Forward => state.webengine.go_forward(),
+                Event::Refresh => state.webengine.refresh(),
+                Event::Home => state.webengine.goto_url(&state.config.start_page),
+                Event::UrlChanged(url) => self.url = url,
+                Event::UrlPasted(url) => {
+                    state.webengine.goto_url(&url);
+                    self.url = url;
                 }
-                Event::UrlEdited(url) => self.1 = url,
-                Event::UrlChanged(url) => self.0.lock().unwrap().webengine.goto_url(&url),
+                Event::UrlSubmitted => state.webengine.goto_url(&self.url),
             }
             None
         }
 
         fn view(&self, _state: &Self::State) -> Element<'_, Event, Theme> {
-            let url = match self.0.lock().unwrap().webengine.get_url() {
-                Some(url) => url,
-                None => "Homepage".to_string(),
-            };
-            let bar = row!(
+            row!(
                 container(Button::new(text("<")).on_press(Event::Backward)).padding(2),
                 container(Button::new(text(">")).on_press(Event::Forward)).padding(2),
                 container(Button::new(text("H")).on_press(Event::Home)).padding(2),
                 container(Button::new(text("R")).on_press(Event::Refresh)).padding(2),
                 Space::new(Length::Fill, Length::Shrink),
                 container(
-                    text_input("https://site.com", &url)
-                        .on_input(Event::UrlEdited)
-                        .on_submit(Event::UrlChanged(self.1.clone()))
+                    text_input("https://site.com", &self.url.as_str())
+                        .on_input(Event::UrlChanged)
+                        .on_paste(Event::UrlPasted)
+                        .on_submit(Event::UrlSubmitted)
                         .line_height(LineHeight::Relative(2.0))
                 )
                 .padding(2)
                 .center_x()
                 .center_y(),
                 Space::new(Length::Fill, Length::Shrink),
-            );
-            bar.into()
+            )
+            .into()
         }
 
         fn size_hint(&self) -> Size<Length> {
@@ -152,18 +153,30 @@ pub mod nav_bar {
 
 pub use browser_view::browser_view;
 pub mod browser_view {
-    use super::*;
+    use super::{BrowserEngine, State};
+
+    use iced::advanced::{
+        self,
+        graphics::core::event,
+        layout, mouse,
+        renderer::{self},
+        widget::Tree,
+        Clipboard, Layout, Shell, Widget,
+    };
+    use iced::event::Status;
+    use iced::widget::image::{Handle, Image};
+    use iced::{theme::Theme, Element, Event, Length, Rectangle, Size};
 
     // helper function to create browser view
-    pub fn browser_view(state: Arc<Mutex<State>>) -> BrowserView {
+    pub fn browser_view(state: &State) -> BrowserView {
         BrowserView::new(state)
     }
 
-    pub struct BrowserView(Arc<Mutex<State>>);
+    pub struct BrowserView(State);
 
     impl BrowserView {
-        pub fn new(state: Arc<Mutex<State>>) -> Self {
-            Self(state)
+        pub fn new(state: &State) -> Self {
+            Self(state.clone())
         }
     }
 
@@ -197,7 +210,7 @@ pub mod browser_view {
             cursor: mouse::Cursor,
             viewport: &Rectangle,
         ) {
-            let mut state = self.0.lock().unwrap();
+            let mut state = self.0 .0.lock().unwrap();
 
             let (w, h) = {
                 let current_size = state.webengine.size();
@@ -214,6 +227,7 @@ pub mod browser_view {
                 }
             };
 
+            state.webengine.do_work();
             state.webengine.render();
             let handle = match state.webengine.pixel_buffer() {
                 Some(image) => {
@@ -232,7 +246,6 @@ pub mod browser_view {
                     Handle::from_pixels(w, h, image)
                 }
             };
-            // Image::<Handle>::new(handle).draw(tree, renderer, theme, style, layout, cursor, viewport)
             <Image<Handle> as Widget<Message, Theme, Renderer>>::draw(
                 &Image::<Handle>::new(handle),
                 tree,
@@ -264,8 +277,8 @@ pub mod browser_view {
             &mut self,
             _state: &mut Tree,
             event: Event,
-            _layout: Layout<'_>,
-            _cursor: mouse::Cursor,
+            layout: Layout<'_>,
+            cursor: mouse::Cursor,
             _renderer: &Renderer,
             _clipboard: &mut dyn Clipboard,
             _shell: &mut Shell<'_, Message>,
@@ -274,27 +287,31 @@ pub mod browser_view {
             match event {
                 Event::Keyboard(keyboard_event) => self
                     .0
+                     .0
                     .lock()
                     .unwrap()
                     .webengine
                     .handle_keyboard_event(keyboard_event),
-                Event::Mouse(mouse_event) => self
-                    .0
-                    .lock()
-                    .unwrap()
-                    .webengine
-                    .handle_mouse_event(mouse_event),
-
-                // ignore all unhandled events
-                _ => event::Status::Ignored,
+                Event::Mouse(mouse_event) => {
+                    if let Some(point) = cursor.position_in(layout.bounds()) {
+                        self.0
+                             .0
+                            .lock()
+                            .unwrap()
+                            .webengine
+                            .handle_mouse_event(point, mouse_event)
+                    } else {
+                        Status::Ignored
+                    }
+                }
+                _ => Status::Ignored,
             }
         }
     }
 
     impl<'a, Message, Renderer> From<BrowserView> for Element<'a, Message, Theme, Renderer>
     where
-        Renderer: iced::advanced::Renderer
-            + iced::advanced::image::Renderer<Handle = iced::advanced::image::Handle>,
+        Renderer: advanced::Renderer + advanced::image::Renderer<Handle = advanced::image::Handle>,
     {
         fn from(widget: BrowserView) -> Self {
             Self::new(widget)

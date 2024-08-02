@@ -1,10 +1,11 @@
 [package]
-name = "app"
+name = "icy_browser"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 iced = { version = "0.12.1", features = ["advanced", "image", "tokio", "lazy"] }
+smol_str = "0.2.2"
 ul-next = { version = "0.2.0", optional = true }
 
 [features]
