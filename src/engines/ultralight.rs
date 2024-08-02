@@ -71,8 +71,28 @@ impl Ultralight {
         }
     }
 
-    fn get_tab(&mut self) -> Option<&Tab> {
-        self.tabs.get(&self.current_tab.clone()?)
+    fn get_tab(&self) -> Option<&Tab> {
+        if let Some(url) = self.current_tab.as_ref() {
+            if let Some(tab) = self.tabs.get(url) {
+                Some(tab)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn get_tab_mut(&mut self) -> Option<&mut Tab> {
+        if let Some(url) = self.current_tab.as_mut() {
+            if let Some(tab) = self.tabs.get_mut(url) {
+                Some(tab)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -90,11 +110,7 @@ impl BrowserEngine for Ultralight {
     }
 
     fn needs_render(&self) -> bool {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .needs_paint()
+        self.get_tab().unwrap().view.needs_paint()
     }
 
     fn size(&self) -> (u32, u32) {
@@ -111,12 +127,7 @@ impl BrowserEngine for Ultralight {
 
     fn pixel_buffer(&mut self) -> Option<Vec<u8>> {
         // Get the raw pixels of the surface
-        if let Some(pixels_data) = self
-            .tabs
-            .get_mut(&self.current_tab.clone()?)?
-            .surface
-            .lock_pixels()
-        {
+        if let Some(pixels_data) = self.get_tab_mut()?.surface.lock_pixels() {
             let mut vec = Vec::new();
             vec.extend_from_slice(&pixels_data);
             Some(vec)
@@ -130,21 +141,11 @@ impl BrowserEngine for Ultralight {
     }
 
     fn goto_url(&self, url: &str) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .load_url(url)
-            .unwrap();
+        self.get_tab().unwrap().view.load_url(url).unwrap();
     }
 
     fn has_loaded(&self) -> bool {
-        !self
-            .tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .is_loading()
+        !self.get_tab().unwrap().view.is_loading()
     }
 
     fn new_tab(&mut self, url: &str) {
@@ -181,43 +182,23 @@ impl BrowserEngine for Ultralight {
     }
 
     fn refresh(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .reload();
+        self.get_tab().unwrap().view.reload();
     }
 
     fn go_forward(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .go_forward();
+        self.get_tab().unwrap().view.go_forward();
     }
 
     fn go_back(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .go_back();
+        self.get_tab().unwrap().view.go_back();
     }
 
     fn focus(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .focus();
+        self.get_tab().unwrap().view.focus();
     }
 
     fn unfocus(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .unfocus();
+        self.get_tab().unwrap().view.unfocus();
     }
 
     fn scroll(&self, delta: ScrollDelta) -> Status {
@@ -235,11 +216,7 @@ impl BrowserEngine for Ultralight {
             )
             .unwrap(),
         };
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .fire_scroll_event(scroll_event);
+        self.get_tab().unwrap().view.fire_scroll_event(scroll_event);
         Status::Captured
     }
 
@@ -275,11 +252,7 @@ impl BrowserEngine for Ultralight {
 
         match key_event {
             Some(key_event) => {
-                self.tabs
-                    .get(&self.current_tab.clone().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_key_event(key_event);
+                self.get_tab().unwrap().view.fire_key_event(key_event);
 
                 Status::Captured
             }

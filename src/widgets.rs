@@ -17,17 +17,18 @@ impl Default for Config {
 }
 
 // Holds the State of the Browser Widgets
-pub struct State(pub Arc<Mutex<StateGuard>>);
-
-impl Clone for State {
-    fn clone(&self) -> State {
-        State(self.0.clone())
-    }
+pub struct State {
+    config: Config,
+    engine: Arc<Mutex<Engine>>,
 }
 
-struct StateGuard {
-    config: Config,
-    engine: Engine,
+impl Clone for State {
+    fn clone(&self) -> Self {
+        State {
+            config: self.config.clone(),
+            engine: self.engine.clone(),
+        }
+    }
 }
 
 impl State {
@@ -36,14 +37,17 @@ impl State {
         let config = Config::default();
         engine.send(Commands::NewTab(config.start_page.clone()));
 
-        Self(Arc::new(Mutex::new(StateGuard { config, engine })))
+        Self {
+            config,
+            engine: Arc::new(Mutex::new(engine)),
+        }
     }
 }
 
 pub use nav_bar::nav_bar;
 pub mod nav_bar {
 
-    use super::{Commands, CommandsRecv, State};
+    use super::{Commands, State};
 
     use iced::widget::text_input;
     use iced::{
@@ -77,7 +81,7 @@ pub mod nav_bar {
     impl NavBar {
         pub fn new(state: &State) -> Option<Self> {
             let state = state.clone();
-            let url = state.0.lock().ok()?.config.start_page.clone();
+            let url = state.config.start_page.clone();
             Some(Self { state, url })
         }
     }
@@ -87,21 +91,19 @@ pub mod nav_bar {
         type Event = Event;
 
         fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
-            let state = self.state.0.lock().ok()?;
+            let engine = self.state.engine.lock().unwrap();
 
             match event {
-                Event::Backward => state.engine.send(Commands::GoBackward),
-                Event::Forward => state.engine.send(Commands::GoForward),
-                Event::Refresh => state.engine.send(Commands::Refresh),
-                Event::Home => state
-                    .engine
-                    .send(Commands::GotoUrl(state.config.start_page.clone())),
+                Event::Backward => engine.send(Commands::GoBackward),
+                Event::Forward => engine.send(Commands::GoForward),
+                Event::Refresh => engine.send(Commands::Refresh),
+                Event::Home => engine.send(Commands::GotoUrl(self.state.config.start_page.clone())),
                 Event::UrlChanged(url) => self.url = url,
                 Event::UrlPasted(url) => {
-                    state.engine.send(Commands::GotoUrl(url.clone()));
+                    engine.send(Commands::GotoUrl(url.clone()));
                     self.url = url;
                 }
-                Event::UrlSubmitted => state.engine.send(Commands::GotoUrl(self.url.clone())),
+                Event::UrlSubmitted => engine.send(Commands::GotoUrl(self.url.clone())),
             }
             None
         }
@@ -202,22 +204,21 @@ pub mod browser_view {
             cursor: mouse::Cursor,
             viewport: &Rectangle,
         ) {
-            let mut state = self.0 .0.lock().unwrap();
+            let engine = self.0.engine.lock().unwrap();
 
             let (w, h) = {
-                let current_size =
-                    if let CommandsRecv::Size(w, h) = state.engine.recv(Commands::Size) {
-                        (w, h)
-                    } else {
-                        (800, 800)
-                    };
+                let current_size = if let CommandsRecv::Size(w, h) = engine.recv(Commands::Size) {
+                    (w, h)
+                } else {
+                    (800, 800)
+                };
                 let allowed_size = layout.bounds().size();
                 if current_size.0 == allowed_size.width as u32
                     && current_size.1 == allowed_size.height as u32
                 {
                     current_size
                 } else {
-                    state.engine.send(Commands::Resize(
+                    engine.send(Commands::Resize(
                         allowed_size.width as u32,
                         allowed_size.height as u32,
                     ));
@@ -225,11 +226,11 @@ pub mod browser_view {
                 }
             };
 
-            state.engine.send(Commands::DoWork);
-            if let CommandsRecv::NeedRender(need) = state.engine.recv(Commands::NeedRender) {
-                need.then(|| state.engine.send(Commands::Render));
+            engine.send(Commands::DoWork);
+            if let CommandsRecv::NeedRender(need) = engine.recv(Commands::NeedRender) {
+                need.then(|| engine.send(Commands::Render));
             }
-            let handle = match state.engine.recv(Commands::PixelBuffer) {
+            let handle = match engine.recv(Commands::PixelBuffer) {
                 CommandsRecv::PixelBuffer(image) => {
                     let image = bgr_to_rgb(image);
                     Handle::from_pixels(w, h, image)
@@ -284,15 +285,12 @@ pub mod browser_view {
             _shell: &mut Shell<'_, Message>,
             _viewport: &Rectangle,
         ) -> event::Status {
+            let engine = self.0.engine.lock().unwrap();
+
             match event {
                 Event::Keyboard(keyboard_event) => {
-                    if let CommandsRecv::Keyboard(status) = self
-                        .0
-                         .0
-                        .lock()
-                        .unwrap()
-                        .engine
-                        .recv(Commands::Keyboard(keyboard_event))
+                    if let CommandsRecv::Keyboard(status) =
+                        engine.recv(Commands::Keyboard(keyboard_event))
                     {
                         status
                     } else {
@@ -301,13 +299,8 @@ pub mod browser_view {
                 }
                 Event::Mouse(mouse_event) => {
                     if let Some(point) = cursor.position_in(layout.bounds()) {
-                        if let CommandsRecv::Mouse(status) = self
-                            .0
-                             .0
-                            .lock()
-                            .unwrap()
-                            .engine
-                            .recv(Commands::Mouse(point, mouse_event))
+                        if let CommandsRecv::Mouse(status) =
+                            engine.recv(Commands::Mouse(point, mouse_event))
                         {
                             status
                         } else {
