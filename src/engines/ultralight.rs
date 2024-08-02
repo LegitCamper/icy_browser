@@ -1,21 +1,21 @@
-use std::collections::HashMap;
-
 use iced::event::Status;
 use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
 use iced::Point;
-
 use smol_str::SmolStr;
+use std::collections::HashMap;
 use ul_next::event::{self, KeyEventCreationInfo};
 use ul_next::{
     config::Config,
-    event::{KeyEvent, MouseEvent, ScrollEvent},
+    event::{MouseEvent, ScrollEvent},
     key_code::VirtualKeyCode,
     platform::{self, LogLevel, Logger},
     renderer::Renderer,
     view::{View, ViewConfig},
     Surface,
 };
+
+use super::BrowserEngine;
 
 struct UlLogger;
 impl Logger for UlLogger {
@@ -28,7 +28,6 @@ pub struct Tab {
     url: String,
     view: View,
     surface: Surface,
-    image: Option<Vec<u8>>,
 }
 
 pub struct Ultralight {
@@ -42,7 +41,10 @@ pub struct Ultralight {
 }
 
 impl Ultralight {
-    pub fn new(width: u32, height: u32) -> Self {
+    pub fn new(width: u32, height: u32) -> Self
+    where
+        Self: Sized,
+    {
         let config = Config::start().build().unwrap();
         platform::enable_platform_fontloader();
         // TODO: this should change to ~/.rust-browser
@@ -74,7 +76,7 @@ impl Ultralight {
     }
 }
 
-impl super::BrowserEngine for Ultralight {
+impl BrowserEngine for Ultralight {
     fn new(width: u32, height: u32) -> Self {
         Self::new(width, height)
     }
@@ -85,6 +87,14 @@ impl super::BrowserEngine for Ultralight {
 
     fn render(&self) {
         self.renderer.render()
+    }
+
+    fn needs_render(&self) -> bool {
+        self.tabs
+            .get(&self.current_tab.clone().unwrap())
+            .unwrap()
+            .view
+            .needs_paint()
     }
 
     fn size(&self) -> (u32, u32) {
@@ -154,7 +164,6 @@ impl super::BrowserEngine for Ultralight {
                 url: url.to_owned(),
                 view,
                 surface,
-                image: None,
             };
 
             self.tabs.entry(tab.url.clone()).or_insert(tab);

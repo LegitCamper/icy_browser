@@ -1,8 +1,6 @@
-use crate::engines::{self, BrowserEngine};
-#[cfg(feature = "webkit")]
-use engines::ultralight::Ultralight;
-
 use std::sync::{Arc, Mutex};
+
+use crate::engines::{Commands, CommandsRecv, Engine};
 
 // Configures the Browser Widget
 #[derive(Debug, Clone)]
@@ -27,33 +25,25 @@ impl Clone for State {
     }
 }
 
-pub struct StateGuard {
-    pub config: Config,
-    #[cfg(feature = "webkit")]
-    pub webengine: Ultralight,
+struct StateGuard {
+    config: Config,
+    engine: Engine,
 }
 
 impl State {
     pub fn new() -> Self {
-        #[cfg(feature = "webkit")]
-        // size does not matter since it is resized to fit window
-        let mut webengine = Ultralight::new(1600, 1600);
-
+        let engine = Engine::new();
         let config = Config::default();
-        webengine.new_tab(&config.start_page);
+        engine.send(Commands::NewTab(config.start_page.clone()));
 
-        Self(Arc::new(Mutex::new(StateGuard { config, webengine })))
-    }
-
-    pub fn do_work(&self) {
-        self.0.lock().unwrap().webengine.do_work()
+        Self(Arc::new(Mutex::new(StateGuard { config, engine })))
     }
 }
 
 pub use nav_bar::nav_bar;
 pub mod nav_bar {
 
-    use super::{BrowserEngine, State};
+    use super::{Commands, CommandsRecv, State};
 
     use iced::widget::text_input;
     use iced::{
@@ -100,16 +90,18 @@ pub mod nav_bar {
             let state = self.state.0.lock().ok()?;
 
             match event {
-                Event::Backward => state.webengine.go_back(),
-                Event::Forward => state.webengine.go_forward(),
-                Event::Refresh => state.webengine.refresh(),
-                Event::Home => state.webengine.goto_url(&state.config.start_page),
+                Event::Backward => state.engine.send(Commands::GoBackward),
+                Event::Forward => state.engine.send(Commands::GoForward),
+                Event::Refresh => state.engine.send(Commands::Refresh),
+                Event::Home => state
+                    .engine
+                    .send(Commands::GotoUrl(state.config.start_page.clone())),
                 Event::UrlChanged(url) => self.url = url,
                 Event::UrlPasted(url) => {
-                    state.webengine.goto_url(&url);
+                    state.engine.send(Commands::GotoUrl(url.clone()));
                     self.url = url;
                 }
-                Event::UrlSubmitted => state.webengine.goto_url(&self.url),
+                Event::UrlSubmitted => state.engine.send(Commands::GotoUrl(self.url.clone())),
             }
             None
         }
@@ -153,7 +145,7 @@ pub mod nav_bar {
 
 pub use browser_view::browser_view;
 pub mod browser_view {
-    use super::{BrowserEngine, State};
+    use super::{Commands, CommandsRecv, State};
 
     use iced::advanced::{
         self,
@@ -213,28 +205,36 @@ pub mod browser_view {
             let mut state = self.0 .0.lock().unwrap();
 
             let (w, h) = {
-                let current_size = state.webengine.size();
+                let current_size =
+                    if let CommandsRecv::Size(w, h) = state.engine.recv(Commands::Size) {
+                        (w, h)
+                    } else {
+                        (800, 800)
+                    };
                 let allowed_size = layout.bounds().size();
                 if current_size.0 == allowed_size.width as u32
                     && current_size.1 == allowed_size.height as u32
                 {
                     current_size
                 } else {
-                    state
-                        .webengine
-                        .resize(allowed_size.width as u32, allowed_size.height as u32);
+                    state.engine.send(Commands::Resize(
+                        allowed_size.width as u32,
+                        allowed_size.height as u32,
+                    ));
                     (allowed_size.width as u32, allowed_size.height as u32)
                 }
             };
 
-            state.webengine.do_work();
-            state.webengine.render();
-            let handle = match state.webengine.pixel_buffer() {
-                Some(image) => {
+            state.engine.send(Commands::DoWork);
+            if let CommandsRecv::NeedRender(need) = state.engine.recv(Commands::NeedRender) {
+                need.then(|| state.engine.send(Commands::Render));
+            }
+            let handle = match state.engine.recv(Commands::PixelBuffer) {
+                CommandsRecv::PixelBuffer(image) => {
                     let image = bgr_to_rgb(image);
                     Handle::from_pixels(w, h, image)
                 }
-                None => {
+                _ => {
                     let palatte = theme.palette().background;
                     let mut image: Vec<u8> = Vec::new();
                     for _ in 0..((w * h) / 4) {
@@ -285,21 +285,34 @@ pub mod browser_view {
             _viewport: &Rectangle,
         ) -> event::Status {
             match event {
-                Event::Keyboard(keyboard_event) => self
-                    .0
-                     .0
-                    .lock()
-                    .unwrap()
-                    .webengine
-                    .handle_keyboard_event(keyboard_event),
+                Event::Keyboard(keyboard_event) => {
+                    if let CommandsRecv::Keyboard(status) = self
+                        .0
+                         .0
+                        .lock()
+                        .unwrap()
+                        .engine
+                        .recv(Commands::Keyboard(keyboard_event))
+                    {
+                        status
+                    } else {
+                        Status::Ignored
+                    }
+                }
                 Event::Mouse(mouse_event) => {
                     if let Some(point) = cursor.position_in(layout.bounds()) {
-                        self.0
+                        if let CommandsRecv::Mouse(status) = self
+                            .0
                              .0
                             .lock()
                             .unwrap()
-                            .webengine
-                            .handle_mouse_event(point, mouse_event)
+                            .engine
+                            .recv(Commands::Mouse(point, mouse_event))
+                        {
+                            status
+                        } else {
+                            Status::Ignored
+                        }
                     } else {
                         Status::Ignored
                     }
