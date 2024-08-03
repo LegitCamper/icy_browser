@@ -1,11 +1,10 @@
-use std::collections::HashMap;
-
 use iced::event::Status;
 use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
+use iced::widget::image::{Handle, Image};
 use iced::Point;
-
 use smol_str::SmolStr;
+use std::collections::HashMap;
 use ul_next::event::{self, KeyEventCreationInfo};
 use ul_next::{
     config::Config,
@@ -17,6 +16,8 @@ use ul_next::{
     Surface,
 };
 
+use super::{create_empty_view, create_image, BrowserEngine};
+
 struct UlLogger;
 impl Logger for UlLogger {
     fn log_message(&mut self, log_level: LogLevel, message: String) {
@@ -25,9 +26,10 @@ impl Logger for UlLogger {
 }
 
 pub struct Tab {
-    url: String,
+    title: String,
     view: View,
     surface: Surface,
+    last_view: Image<Handle>,
 }
 
 pub struct Ultralight {
@@ -65,6 +67,12 @@ impl Ultralight {
             current_tab: None,
             tabs: HashMap::new(),
         }
+    }
+
+    fn update_view(&mut self) {
+        let image = self.pixel_buffer().unwrap();
+        let size = self.size();
+        self.get_tab_mut().unwrap().last_view = create_image(image, size.0, size.1, true)
     }
 
     fn get_tab(&self) -> Option<&Tab> {
@@ -105,9 +113,10 @@ impl super::BrowserEngine for Ultralight {
         self.get_tab().unwrap().view.needs_paint()
     }
 
-    fn render(&self) {
+    fn render(&mut self) {
         if self.need_render() {
-            self.renderer.render()
+            self.renderer.render();
+            self.update_view();
         }
     }
 
@@ -123,15 +132,23 @@ impl super::BrowserEngine for Ultralight {
         })
     }
 
+    fn get_image(&mut self) -> Option<&Image<Handle>> {
+        Some(&self.get_tab()?.last_view)
+    }
+
     fn pixel_buffer(&mut self) -> Option<Vec<u8>> {
         // Get the raw pixels of the surface
-        if let Some(pixels_data) = self.get_tab_mut().unwrap().surface.lock_pixels() {
+        if let Some(pixels_data) = self.get_tab_mut()?.surface.lock_pixels() {
             let mut vec = Vec::new();
             vec.extend_from_slice(&pixels_data);
             Some(vec)
         } else {
             None
         }
+    }
+
+    fn get_title(&self) -> Option<String> {
+        self.get_tab()?.view.title().ok()
     }
 
     fn get_url(&self) -> Option<String> {
@@ -156,13 +173,16 @@ impl super::BrowserEngine for Ultralight {
             let surface = view.surface().unwrap();
             view.load_url(url).unwrap();
 
+            let title = view.title().unwrap();
+
             // RGBA
             debug_assert!(surface.row_bytes() / self.width == 4);
 
             let tab = Tab {
-                url: url.to_owned(),
+                title,
                 view,
                 surface,
+                last_view: create_empty_view(800, 800),
             };
 
             self.tabs.entry(url.to_string()).or_insert(tab);

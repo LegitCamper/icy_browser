@@ -19,40 +19,39 @@ impl Default for Config {
 }
 
 // Holds the State of the Browser Widgets
-pub struct State(pub Arc<Mutex<StateGuard>>);
+pub struct State {
+    config: Config,
+    #[cfg(feature = "webkit")]
+    webengine: Arc<Mutex<Ultralight>>,
+}
 
 impl Clone for State {
     fn clone(&self) -> State {
-        State(self.0.clone())
+        State {
+            config: self.config.clone(),
+            webengine: self.webengine.clone(),
+        }
     }
-}
-
-pub struct StateGuard {
-    pub config: Config,
-    #[cfg(feature = "webkit")]
-    pub webengine: Ultralight,
 }
 
 impl State {
     pub fn new() -> Self {
         #[cfg(feature = "webkit")]
         // size does not matter since it is resized to fit window
-        let mut webengine = Ultralight::new(1600, 1600);
+        let mut webengine = Ultralight::new(800, 800);
 
         let config = Config::default();
         webengine.new_tab(&config.start_page);
 
-        Self(Arc::new(Mutex::new(StateGuard { config, webengine })))
-    }
-
-    pub fn do_work(&self) {
-        self.0.lock().unwrap().webengine.do_work()
+        State {
+            config,
+            webengine: Arc::new(Mutex::new(webengine)),
+        }
     }
 }
 
 pub use nav_bar::nav_bar;
 pub mod nav_bar {
-
     use super::{BrowserEngine, State};
 
     use iced::widget::text_input;
@@ -87,7 +86,7 @@ pub mod nav_bar {
     impl NavBar {
         pub fn new(state: &State) -> Option<Self> {
             let state = state.clone();
-            let url = state.0.lock().ok()?.config.start_page.clone();
+            let url = state.config.start_page.clone();
             Some(Self { state, url })
         }
     }
@@ -97,19 +96,19 @@ pub mod nav_bar {
         type Event = Event;
 
         fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
-            let state = self.state.0.lock().ok()?;
-
-            match event {
-                Event::Backward => state.webengine.go_back(),
-                Event::Forward => state.webengine.go_forward(),
-                Event::Refresh => state.webengine.refresh(),
-                Event::Home => state.webengine.goto_url(&state.config.start_page),
-                Event::UrlChanged(url) => self.url = url,
-                Event::UrlPasted(url) => {
-                    state.webengine.goto_url(&url);
-                    self.url = url;
+            if let Ok(webengine) = self.state.webengine.lock() {
+                match event {
+                    Event::Backward => webengine.go_back(),
+                    Event::Forward => webengine.go_forward(),
+                    Event::Refresh => webengine.refresh(),
+                    Event::Home => webengine.goto_url(&self.state.config.start_page),
+                    Event::UrlChanged(url) => self.url = url,
+                    Event::UrlPasted(url) => {
+                        webengine.goto_url(&url);
+                        self.url = url;
+                    }
+                    Event::UrlSubmitted => webengine.goto_url(&self.url),
                 }
-                Event::UrlSubmitted => state.webengine.goto_url(&self.url),
             }
             None
         }
@@ -153,6 +152,8 @@ pub mod nav_bar {
 
 pub use browser_view::browser_view;
 pub mod browser_view {
+    use crate::engines::create_empty_view;
+
     use super::{BrowserEngine, State};
 
     use iced::advanced::{
@@ -210,51 +211,27 @@ pub mod browser_view {
             cursor: mouse::Cursor,
             viewport: &Rectangle,
         ) {
-            let mut state = self.0 .0.lock().unwrap();
+            let mut webengine = self.0.webengine.lock().unwrap();
 
-            let (w, h) = {
-                let current_size = state.webengine.size();
-                let allowed_size = layout.bounds().size();
-                if current_size.0 == allowed_size.width as u32
-                    && current_size.1 == allowed_size.height as u32
-                {
-                    current_size
-                } else {
-                    state
-                        .webengine
-                        .resize(allowed_size.width as u32, allowed_size.height as u32);
-                    (allowed_size.width as u32, allowed_size.height as u32)
-                }
-            };
+            let current_size = webengine.size();
+            let allowed_size = layout.bounds().size();
+            if current_size.0 != allowed_size.width as u32
+                || current_size.1 != allowed_size.height as u32
+            {
+                webengine.resize(allowed_size.width as u32, allowed_size.height as u32);
+            }
 
-            state.webengine.do_work();
-            state.webengine.render();
-            let handle = match state.webengine.pixel_buffer() {
-                Some(image) => {
-                    let image = bgr_to_rgb(image);
-                    Handle::from_pixels(w, h, image)
-                }
+            webengine.do_work();
+            webengine.render();
+            let image = match webengine.get_image() {
+                Some(image) => image,
                 None => {
-                    let palatte = theme.palette().background;
-                    let mut image: Vec<u8> = Vec::new();
-                    for _ in 0..((w * h) / 4) {
-                        image.push(palatte.r as u8);
-                        image.push(palatte.g as u8);
-                        image.push(palatte.b as u8);
-                        image.push(palatte.a as u8);
-                    }
-                    Handle::from_pixels(w, h, image)
+                    let size = webengine.size();
+                    &create_empty_view(size.0, size.1)
                 }
             };
             <Image<Handle> as Widget<Message, Theme, Renderer>>::draw(
-                &Image::<Handle>::new(handle),
-                tree,
-                renderer,
-                theme,
-                style,
-                layout,
-                cursor,
-                viewport,
+                image, tree, renderer, theme, style, layout, cursor, viewport,
             )
         }
 
@@ -284,22 +261,13 @@ pub mod browser_view {
             _shell: &mut Shell<'_, Message>,
             _viewport: &Rectangle,
         ) -> event::Status {
+            let mut webengine = self.0.webengine.lock().unwrap();
+
             match event {
-                Event::Keyboard(keyboard_event) => self
-                    .0
-                     .0
-                    .lock()
-                    .unwrap()
-                    .webengine
-                    .handle_keyboard_event(keyboard_event),
+                Event::Keyboard(keyboard_event) => webengine.handle_keyboard_event(keyboard_event),
                 Event::Mouse(mouse_event) => {
                     if let Some(point) = cursor.position_in(layout.bounds()) {
-                        self.0
-                             .0
-                            .lock()
-                            .unwrap()
-                            .webengine
-                            .handle_mouse_event(point, mouse_event)
+                        webengine.handle_mouse_event(point, mouse_event)
                     } else {
                         Status::Ignored
                     }
@@ -316,13 +284,5 @@ pub mod browser_view {
         fn from(widget: BrowserView) -> Self {
             Self::new(widget)
         }
-    }
-
-    fn bgr_to_rgb(image: Vec<u8>) -> Vec<u8> {
-        image
-            .chunks(4)
-            .map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
-            .flatten()
-            .collect()
     }
 }
