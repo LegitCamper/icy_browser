@@ -5,6 +5,7 @@ use iced::widget::image::{Handle, Image};
 use iced::Point;
 use smol_str::SmolStr;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use ul_next::event::{self, KeyEventCreationInfo};
 use ul_next::{
     config::Config,
@@ -26,13 +27,31 @@ impl Logger for UlLogger {
 }
 
 pub struct Tab {
-    title: String,
+    _title: String,
     view: View,
     surface: Surface,
     last_view: Image<Handle>,
 }
 
-pub struct Ultralight {
+// have to explicity mark as Send because it contains raw pointers
+// this is neccisary to have a background task that runs do_work()
+unsafe impl Send for UltralightInner {}
+pub struct Ultralight(pub Arc<Mutex<UltralightInner>>);
+
+impl Ultralight {
+    pub fn new() -> Self {
+        // size does not matter since it is resized to fit window
+        Self(Arc::new(Mutex::new(UltralightInner::new(800, 800))))
+    }
+}
+
+impl Clone for Ultralight {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+pub struct UltralightInner {
     renderer: Renderer,
     view_config: ViewConfig,
     width: u32,
@@ -41,8 +60,8 @@ pub struct Ultralight {
     tabs: HashMap<String, Tab>,
 }
 
-impl Ultralight {
-    pub fn new(width: u32, height: u32) -> Self {
+impl UltralightInner {
+    fn new(width: u32, height: u32) -> Self {
         let config = Config::start().build().unwrap();
         platform::enable_platform_fontloader();
         // TODO: this should change to ~/.rust-browser
@@ -100,7 +119,7 @@ impl Ultralight {
     }
 }
 
-impl super::BrowserEngine for Ultralight {
+impl super::BrowserEngine for UltralightInner {
     fn new(width: u32, height: u32) -> Self {
         Self::new(width, height)
     }
@@ -132,10 +151,6 @@ impl super::BrowserEngine for Ultralight {
         })
     }
 
-    fn get_image(&mut self) -> Option<&Image<Handle>> {
-        Some(&self.get_tab()?.last_view)
-    }
-
     fn pixel_buffer(&mut self) -> Option<Vec<u8>> {
         // Get the raw pixels of the surface
         if let Some(pixels_data) = self.get_tab_mut()?.surface.lock_pixels() {
@@ -145,6 +160,10 @@ impl super::BrowserEngine for Ultralight {
         } else {
             None
         }
+    }
+
+    fn get_image(&mut self) -> Option<&Image<Handle>> {
+        Some(&self.get_tab()?.last_view)
     }
 
     fn get_title(&self) -> Option<String> {
@@ -179,7 +198,7 @@ impl super::BrowserEngine for Ultralight {
             debug_assert!(surface.row_bytes() / self.width == 4);
 
             let tab = Tab {
-                title,
+                _title: title,
                 view,
                 surface,
                 last_view: create_empty_view(800, 800),
@@ -461,8 +480,6 @@ fn iced_key_to_ultralight_key(
         Some(text) => &text.to_string(),
         None => "",
     };
-
-    println!("text {}", text);
 
     let creation_info = KeyEventCreationInfo {
         ty,

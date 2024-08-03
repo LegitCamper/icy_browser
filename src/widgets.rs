@@ -2,7 +2,10 @@ use crate::engines::{self, BrowserEngine};
 #[cfg(feature = "webkit")]
 use engines::ultralight::Ultralight;
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
+use tokio::runtime::Runtime;
 
 // Configures the Browser Widget
 #[derive(Debug, Clone)]
@@ -19,33 +22,36 @@ impl Default for Config {
 }
 
 // Holds the State of the Browser Widgets
+#[derive(Clone)]
 pub struct State {
     config: Config,
     #[cfg(feature = "webkit")]
-    webengine: Arc<Mutex<Ultralight>>,
-}
-
-impl Clone for State {
-    fn clone(&self) -> State {
-        State {
-            config: self.config.clone(),
-            webengine: self.webengine.clone(),
-        }
-    }
+    webengine: Ultralight,
+    // This is not used but has to be held to ensure
+    // background task continues running
+    _background_tasks: Arc<Runtime>,
 }
 
 impl State {
     pub fn new() -> Self {
         #[cfg(feature = "webkit")]
-        // size does not matter since it is resized to fit window
-        let mut webengine = Ultralight::new(800, 800);
+        let webengine = Ultralight::new();
 
         let config = Config::default();
-        webengine.new_tab(&config.start_page);
+        webengine.0.lock().unwrap().new_tab(&config.start_page);
+
+        // spawns ultalight background tasks like Update
+        let bg_tasks = Runtime::new().unwrap();
+        let bg_webengine = webengine.clone();
+        bg_tasks.spawn_blocking(move || loop {
+            bg_webengine.0.lock().unwrap().do_work();
+            thread::sleep(Duration::from_millis(150));
+        });
 
         State {
             config,
-            webengine: Arc::new(Mutex::new(webengine)),
+            webengine,
+            _background_tasks: Arc::new(bg_tasks),
         }
     }
 }
@@ -96,7 +102,7 @@ pub mod nav_bar {
         type Event = Event;
 
         fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
-            if let Ok(webengine) = self.state.webengine.lock() {
+            if let Ok(webengine) = self.state.webengine.0.lock() {
                 match event {
                     Event::Backward => webengine.go_back(),
                     Event::Forward => webengine.go_forward(),
@@ -211,7 +217,7 @@ pub mod browser_view {
             cursor: mouse::Cursor,
             viewport: &Rectangle,
         ) {
-            let mut webengine = self.0.webengine.lock().unwrap();
+            let mut webengine = self.0.webengine.0.lock().unwrap();
 
             let current_size = webengine.size();
             let allowed_size = layout.bounds().size();
@@ -221,7 +227,6 @@ pub mod browser_view {
                 webengine.resize(allowed_size.width as u32, allowed_size.height as u32);
             }
 
-            webengine.do_work();
             webengine.render();
             let image = match webengine.get_image() {
                 Some(image) => image,
@@ -261,7 +266,7 @@ pub mod browser_view {
             _shell: &mut Shell<'_, Message>,
             _viewport: &Rectangle,
         ) -> event::Status {
-            let mut webengine = self.0.webengine.lock().unwrap();
+            let mut webengine = self.0.webengine.0.lock().unwrap();
 
             match event {
                 Event::Keyboard(keyboard_event) => webengine.handle_keyboard_event(keyboard_event),
