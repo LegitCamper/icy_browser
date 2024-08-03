@@ -9,7 +9,7 @@ use smol_str::SmolStr;
 use ul_next::event::{self, KeyEventCreationInfo};
 use ul_next::{
     config::Config,
-    event::{KeyEvent, MouseEvent, ScrollEvent},
+    event::{MouseEvent, ScrollEvent},
     key_code::VirtualKeyCode,
     platform::{self, LogLevel, Logger},
     renderer::Renderer,
@@ -28,7 +28,6 @@ pub struct Tab {
     url: String,
     view: View,
     surface: Surface,
-    image: Option<Vec<u8>>,
 }
 
 pub struct Ultralight {
@@ -36,7 +35,6 @@ pub struct Ultralight {
     view_config: ViewConfig,
     width: u32,
     height: u32,
-    // mouse_loc: Option<Point>,
     current_tab: Option<String>,
     tabs: HashMap<String, Tab>,
 }
@@ -69,8 +67,28 @@ impl Ultralight {
         }
     }
 
-    fn get_tab(&mut self) -> Option<&Tab> {
-        self.tabs.get(&self.current_tab.clone()?)
+    fn get_tab(&self) -> Option<&Tab> {
+        if let Some(url) = self.current_tab.as_ref() {
+            if let Some(tab) = self.tabs.get(url) {
+                Some(tab)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn get_tab_mut(&mut self) -> Option<&mut Tab> {
+        if let Some(url) = self.current_tab.as_mut() {
+            if let Some(tab) = self.tabs.get_mut(url) {
+                Some(tab)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 }
 
@@ -83,8 +101,14 @@ impl super::BrowserEngine for Ultralight {
         self.renderer.update()
     }
 
+    fn need_render(&self) -> bool {
+        self.get_tab().unwrap().view.needs_paint()
+    }
+
     fn render(&self) {
-        self.renderer.render()
+        if self.need_render() {
+            self.renderer.render()
+        }
     }
 
     fn size(&self) -> (u32, u32) {
@@ -101,12 +125,7 @@ impl super::BrowserEngine for Ultralight {
 
     fn pixel_buffer(&mut self) -> Option<Vec<u8>> {
         // Get the raw pixels of the surface
-        if let Some(pixels_data) = self
-            .tabs
-            .get_mut(&self.current_tab.clone()?)?
-            .surface
-            .lock_pixels()
-        {
+        if let Some(pixels_data) = self.get_tab_mut().unwrap().surface.lock_pixels() {
             let mut vec = Vec::new();
             vec.extend_from_slice(&pixels_data);
             Some(vec)
@@ -120,21 +139,11 @@ impl super::BrowserEngine for Ultralight {
     }
 
     fn goto_url(&self, url: &str) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .load_url(url)
-            .unwrap();
+        self.get_tab().unwrap().view.load_url(url).unwrap();
     }
 
     fn has_loaded(&self) -> bool {
-        !self
-            .tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .is_loading()
+        !self.get_tab().unwrap().view.is_loading()
     }
 
     fn new_tab(&mut self, url: &str) {
@@ -154,10 +163,9 @@ impl super::BrowserEngine for Ultralight {
                 url: url.to_owned(),
                 view,
                 surface,
-                image: None,
             };
 
-            self.tabs.entry(tab.url.clone()).or_insert(tab);
+            self.tabs.entry(url.to_string()).or_insert(tab);
             self.current_tab = Some(url.to_owned());
         }
     }
@@ -172,43 +180,23 @@ impl super::BrowserEngine for Ultralight {
     }
 
     fn refresh(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .reload();
+        self.get_tab().unwrap().view.reload();
     }
 
     fn go_forward(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .go_forward();
+        self.get_tab().unwrap().view.go_forward();
     }
 
     fn go_back(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .go_back();
+        self.get_tab().unwrap().view.go_back();
     }
 
     fn focus(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .focus();
+        self.get_tab().unwrap().view.focus();
     }
 
     fn unfocus(&self) {
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .unfocus();
+        self.get_tab().unwrap().view.unfocus();
     }
 
     fn scroll(&self, delta: ScrollDelta) -> Status {
@@ -226,11 +214,7 @@ impl super::BrowserEngine for Ultralight {
             )
             .unwrap(),
         };
-        self.tabs
-            .get(&self.current_tab.clone().unwrap())
-            .unwrap()
-            .view
-            .fire_scroll_event(scroll_event);
+        self.get_tab().unwrap().view.fire_scroll_event(scroll_event);
         Status::Captured
     }
 
@@ -266,11 +250,7 @@ impl super::BrowserEngine for Ultralight {
 
         match key_event {
             Some(key_event) => {
-                self.tabs
-                    .get(&self.current_tab.clone().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_key_event(key_event);
+                self.get_tab().unwrap().view.fire_key_event(key_event);
 
                 Status::Captured
             }
@@ -289,83 +269,63 @@ impl super::BrowserEngine for Ultralight {
             mouse::Event::ButtonPressed(mouse::Button::Back) => Status::Ignored,
             mouse::Event::ButtonReleased(mouse::Button::Back) => Status::Ignored,
             mouse::Event::ButtonPressed(mouse::Button::Left) => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseDown,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::Left,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseDown,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::Left,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::ButtonReleased(mouse::Button::Left) => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseUp,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::Left,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseUp,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::Left,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::ButtonPressed(mouse::Button::Right) => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseDown,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::Right,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseDown,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::Right,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::ButtonReleased(mouse::Button::Right) => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseUp,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::Right,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseUp,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::Right,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::CursorMoved { position: _ } => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseMoved,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::None,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseMoved,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::None,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::WheelScrolled { delta } => self.scroll(delta),

@@ -2,11 +2,15 @@ use iced::keyboard;
 use iced::mouse;
 use iced::{event::Status, Point};
 
+#[cfg(feature = "webkit")]
+pub mod ultralight;
+
 #[allow(unused)]
 pub trait BrowserEngine {
     fn new(width: u32, height: u32) -> Self;
 
     fn do_work(&self);
+    fn need_render(&self) -> bool;
     fn render(&self);
     fn size(&self) -> (u32, u32);
     fn resize(&mut self, width: u32, height: u32);
@@ -24,10 +28,7 @@ pub trait BrowserEngine {
     fn focus(&self);
     fn unfocus(&self);
 
-    fn scroll(&self, delta: iced::mouse::ScrollDelta) -> Status;
+    fn scroll(&self, delta: mouse::ScrollDelta) -> Status;
     fn handle_keyboard_event(&self, event: keyboard::Event) -> Status;
     fn handle_mouse_event(&mut self, point: Point, event: mouse::Event) -> Status;
 }
-
-#[cfg(feature = "webkit")]
-pub mod ultralight;
