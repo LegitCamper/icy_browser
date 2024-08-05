@@ -16,7 +16,7 @@ pub trait BrowserEngine {
     fn size(&self) -> (u32, u32);
     fn resize(&mut self, width: u32, height: u32);
     fn pixel_buffer(&mut self) -> Option<Vec<u8>>;
-    fn get_image(&mut self) -> Option<&Image<Handle>>;
+    fn get_image(&mut self) -> Option<Image<Handle>>;
 
     fn get_title(&self) -> Option<String>;
     fn get_url(&self) -> Option<String>;

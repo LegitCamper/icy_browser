@@ -2,10 +2,8 @@ use crate::engines::{self, BrowserEngine};
 #[cfg(feature = "webkit")]
 use engines::ultralight::Ultralight;
 
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
-use tokio::runtime::Runtime;
 
 // Configures the Browser Widget
 #[derive(Debug, Clone)]
@@ -27,9 +25,6 @@ pub struct State {
     config: Config,
     #[cfg(feature = "webkit")]
     webengine: Ultralight,
-    // This is not used but has to be held to ensure
-    // background task continues running
-    _background_tasks: Arc<Runtime>,
 }
 
 impl State {
@@ -40,19 +35,13 @@ impl State {
         let config = Config::default();
         webengine.0.lock().unwrap().new_tab(&config.start_page);
 
-        // spawns ultalight background tasks like Update
-        let bg_tasks = Runtime::new().unwrap();
         let bg_webengine = webengine.clone();
-        bg_tasks.spawn_blocking(move || loop {
+        thread::spawn(move || loop {
             bg_webengine.0.lock().unwrap().do_work();
             thread::sleep(Duration::from_millis(150));
         });
 
-        State {
-            config,
-            webengine,
-            _background_tasks: Arc::new(bg_tasks),
-        }
+        State { config, webengine }
     }
 }
 
@@ -158,9 +147,7 @@ pub mod nav_bar {
 
 pub use browser_view::browser_view;
 pub mod browser_view {
-    use crate::engines::create_empty_view;
-
-    use super::{BrowserEngine, State};
+    use super::{engines::create_empty_view, BrowserEngine, State};
 
     use iced::advanced::{
         self,
@@ -218,25 +205,33 @@ pub mod browser_view {
             viewport: &Rectangle,
         ) {
             let mut webengine = self.0.webengine.0.lock().unwrap();
+            // webengine.do_work();
 
-            let current_size = webengine.size();
-            let allowed_size = layout.bounds().size();
+            let (current_size, allowed_size) = (webengine.size(), layout.bounds().size());
             if current_size.0 != allowed_size.width as u32
                 || current_size.1 != allowed_size.height as u32
             {
                 webengine.resize(allowed_size.width as u32, allowed_size.height as u32);
+                let image = match webengine.get_image() {
+                    Some(image) => image,
+                    None => create_empty_view(current_size.0, current_size.1),
+                };
+                webengine.get_tab_mut().unwrap().last_view = image;
             }
 
-            webengine.render();
-            let image = match webengine.get_image() {
-                Some(image) => image,
-                None => {
-                    let size = webengine.size();
-                    &create_empty_view(size.0, size.1)
-                }
+            if webengine.need_render() {
+                webengine.render();
+                let image = match webengine.get_image() {
+                    Some(image) => image,
+                    None => create_empty_view(current_size.0, current_size.1),
+                };
+                webengine.get_tab_mut().unwrap().last_view = image;
             };
+
+            let image = &webengine.get_tab().unwrap().last_view;
+
             <Image<Handle> as Widget<Message, Theme, Renderer>>::draw(
-                image, tree, renderer, theme, style, layout, cursor, viewport,
+                &image, tree, renderer, theme, style, layout, cursor, viewport,
             )
         }
 

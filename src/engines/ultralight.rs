@@ -17,7 +17,9 @@ use ul_next::{
     Surface,
 };
 
-use super::{create_empty_view, create_image, BrowserEngine};
+use crate::engines::create_empty_view;
+
+use super::create_image;
 
 struct UlLogger;
 impl Logger for UlLogger {
@@ -30,12 +32,9 @@ pub struct Tab {
     _title: String,
     view: View,
     surface: Surface,
-    last_view: Image<Handle>,
+    pub last_view: Image<Handle>,
 }
 
-// have to explicity mark as Send because it contains raw pointers
-// this is neccisary to have a background task that runs do_work()
-unsafe impl Send for UltralightInner {}
 pub struct Ultralight(pub Arc<Mutex<UltralightInner>>);
 
 impl Ultralight {
@@ -50,6 +49,10 @@ impl Clone for Ultralight {
         Self(self.0.clone())
     }
 }
+
+// have to explicity mark as Send because it contains raw pointers
+// this is neccisary to have a background task that runs do_work()
+unsafe impl Send for UltralightInner {}
 
 pub struct UltralightInner {
     renderer: Renderer,
@@ -88,13 +91,7 @@ impl UltralightInner {
         }
     }
 
-    fn update_view(&mut self) {
-        let image = self.pixel_buffer().unwrap();
-        let size = self.size();
-        self.get_tab_mut().unwrap().last_view = create_image(image, size.0, size.1, true)
-    }
-
-    fn get_tab(&self) -> Option<&Tab> {
+    pub fn get_tab(&self) -> Option<&Tab> {
         if let Some(url) = self.current_tab.as_ref() {
             if let Some(tab) = self.tabs.get(url) {
                 Some(tab)
@@ -106,7 +103,7 @@ impl UltralightInner {
         }
     }
 
-    fn get_tab_mut(&mut self) -> Option<&mut Tab> {
+    pub fn get_tab_mut(&mut self) -> Option<&mut Tab> {
         if let Some(url) = self.current_tab.as_mut() {
             if let Some(tab) = self.tabs.get_mut(url) {
                 Some(tab)
@@ -133,10 +130,7 @@ impl super::BrowserEngine for UltralightInner {
     }
 
     fn render(&mut self) {
-        if self.need_render() {
-            self.renderer.render();
-            self.update_view();
-        }
+        self.renderer.render();
     }
 
     fn size(&self) -> (u32, u32) {
@@ -162,8 +156,10 @@ impl super::BrowserEngine for UltralightInner {
         }
     }
 
-    fn get_image(&mut self) -> Option<&Image<Handle>> {
-        Some(&self.get_tab()?.last_view)
+    fn get_image(&mut self) -> Option<Image<Handle>> {
+        let size = self.size();
+        let image = self.pixel_buffer()?;
+        Some(create_image(image, size.0, size.1, true))
     }
 
     fn get_title(&self) -> Option<String> {
@@ -201,7 +197,7 @@ impl super::BrowserEngine for UltralightInner {
                 _title: title,
                 view,
                 surface,
-                last_view: create_empty_view(800, 800),
+                last_view: create_empty_view(self.width, self.height),
             };
 
             self.tabs.entry(url.to_string()).or_insert(tab);
