@@ -5,6 +5,8 @@ use engines::ultralight::Ultralight;
 use std::thread;
 use std::time::Duration;
 
+use crate::engines::{Commands, CommandsRecv, Engine};
+
 // Configures the Browser Widget
 #[derive(Debug, Clone)]
 pub struct Config {

@@ -133,6 +133,10 @@ impl super::BrowserEngine for UltralightInner {
         self.renderer.render();
     }
 
+    fn needs_render(&self) -> bool {
+        self.get_tab().unwrap().view.needs_paint()
+    }
+
     fn size(&self) -> (u32, u32) {
         (self.width, self.height)
     }
