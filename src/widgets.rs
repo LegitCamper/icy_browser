@@ -1,9 +1,8 @@
-use crate::engines::{self, BrowserEngine};
+use crate::engines::{self, BrowserEngine, Engine};
 #[cfg(feature = "webkit")]
 use engines::ultralight::Ultralight;
 
-use std::thread;
-use std::time::Duration;
+use std::sync::{Arc, Mutex};
 
 // Configures the Browser Widget
 #[derive(Debug, Clone)]
@@ -23,25 +22,22 @@ impl Default for Config {
 #[derive(Clone)]
 pub struct State {
     config: Config,
-    #[cfg(feature = "webkit")]
-    webengine: Ultralight,
+    webengine: Arc<Mutex<Engine>>,
 }
 
 impl State {
+    // TODO: this should be generic
     pub fn new() -> Self {
         #[cfg(feature = "webkit")]
-        let webengine = Ultralight::new();
+        let mut webengine = Engine::new::<Ultralight>();
 
         let config = Config::default();
-        webengine.0.lock().unwrap().new_tab(&config.start_page);
+        webengine.new_tab(&config.start_page);
 
-        let bg_webengine = webengine.clone();
-        thread::spawn(move || loop {
-            bg_webengine.0.lock().unwrap().do_work();
-            thread::sleep(Duration::from_millis(150));
-        });
-
-        State { config, webengine }
+        State {
+            config,
+            webengine: Arc::new(Mutex::new(webengine)),
+        }
     }
 }
 
@@ -91,19 +87,18 @@ pub mod nav_bar {
         type Event = Event;
 
         fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
-            if let Ok(webengine) = self.state.webengine.0.lock() {
-                match event {
-                    Event::Backward => webengine.go_back(),
-                    Event::Forward => webengine.go_forward(),
-                    Event::Refresh => webengine.refresh(),
-                    Event::Home => webengine.goto_url(&self.state.config.start_page),
-                    Event::UrlChanged(url) => self.url = url,
-                    Event::UrlPasted(url) => {
-                        webengine.goto_url(&url);
-                        self.url = url;
-                    }
-                    Event::UrlSubmitted => webengine.goto_url(&self.url),
+            let webengine = self.state.webengine.lock().unwrap();
+            match event {
+                Event::Backward => webengine.go_back(),
+                Event::Forward => webengine.go_forward(),
+                Event::Refresh => webengine.refresh(),
+                Event::Home => webengine.goto_url(&self.state.config.start_page),
+                Event::UrlChanged(url) => self.url = url,
+                Event::UrlPasted(url) => {
+                    webengine.goto_url(&url);
+                    self.url = url;
                 }
+                Event::UrlSubmitted => webengine.goto_url(&self.url),
             }
             None
         }
@@ -147,7 +142,9 @@ pub mod nav_bar {
 
 pub use browser_view::browser_view;
 pub mod browser_view {
-    use super::{engines::create_empty_view, BrowserEngine, State};
+    use crate::engines::create_image;
+
+    use super::{BrowserEngine, State};
 
     use iced::advanced::{
         self,
@@ -204,31 +201,18 @@ pub mod browser_view {
             cursor: mouse::Cursor,
             viewport: &Rectangle,
         ) {
-            let mut webengine = self.0.webengine.0.lock().unwrap();
-            // webengine.do_work();
+            let mut webengine = self.0.webengine.lock().unwrap();
+            webengine.do_work();
 
             let (current_size, allowed_size) = (webengine.size(), layout.bounds().size());
             if current_size.0 != allowed_size.width as u32
                 || current_size.1 != allowed_size.height as u32
             {
                 webengine.resize(allowed_size.width as u32, allowed_size.height as u32);
-                let image = match webengine.get_image() {
-                    Some(image) => image,
-                    None => create_empty_view(current_size.0, current_size.1),
-                };
-                webengine.get_tab_mut().unwrap().last_view = image;
             }
 
-            if webengine.need_render() {
-                webengine.render();
-                let image = match webengine.get_image() {
-                    Some(image) => image,
-                    None => create_empty_view(current_size.0, current_size.1),
-                };
-                webengine.get_tab_mut().unwrap().last_view = image;
-            };
-
-            let image = &webengine.get_tab().unwrap().last_view;
+            let image_data = webengine.pixel_buffer().unwrap();
+            let image = create_image(image_data, current_size.0, current_size.1, true);
 
             <Image<Handle> as Widget<Message, Theme, Renderer>>::draw(
                 &image, tree, renderer, theme, style, layout, cursor, viewport,
@@ -261,8 +245,7 @@ pub mod browser_view {
             _shell: &mut Shell<'_, Message>,
             _viewport: &Rectangle,
         ) -> event::Status {
-            let mut webengine = self.0.webengine.0.lock().unwrap();
-
+            let mut webengine = self.0.webengine.lock().unwrap();
             match event {
                 Event::Keyboard(keyboard_event) => webengine.handle_keyboard_event(keyboard_event),
                 Event::Mouse(mouse_event) => {
