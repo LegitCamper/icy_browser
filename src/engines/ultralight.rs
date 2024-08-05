@@ -1,9 +1,11 @@
 use iced::event::Status;
 use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
+use iced::widget::image::{Handle, Image};
 use iced::Point;
 use smol_str::SmolStr;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use ul_next::event::{self, KeyEventCreationInfo};
 use ul_next::{
     config::Config,
@@ -15,7 +17,9 @@ use ul_next::{
     Surface,
 };
 
-use super::BrowserEngine;
+use crate::engines::create_empty_view;
+
+use super::create_image;
 
 struct UlLogger;
 impl Logger for UlLogger {
@@ -25,26 +29,42 @@ impl Logger for UlLogger {
 }
 
 pub struct Tab {
-    url: String,
+    _title: String,
     view: View,
     surface: Surface,
+    pub last_view: Image<Handle>,
 }
 
-pub struct Ultralight {
+pub struct Ultralight(pub Arc<Mutex<UltralightInner>>);
+
+impl Ultralight {
+    pub fn new() -> Self {
+        // size does not matter since it is resized to fit window
+        Self(Arc::new(Mutex::new(UltralightInner::new(800, 800))))
+    }
+}
+
+impl Clone for Ultralight {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+// have to explicity mark as Send because it contains raw pointers
+// this is neccisary to have a background task that runs do_work()
+unsafe impl Send for UltralightInner {}
+
+pub struct UltralightInner {
     renderer: Renderer,
     view_config: ViewConfig,
     width: u32,
     height: u32,
-    // mouse_loc: Option<Point>,
     current_tab: Option<String>,
     tabs: HashMap<String, Tab>,
 }
 
-impl Ultralight {
-    pub fn new(width: u32, height: u32) -> Self
-    where
-        Self: Sized,
-    {
+impl UltralightInner {
+    fn new(width: u32, height: u32) -> Self {
         let config = Config::start().build().unwrap();
         platform::enable_platform_fontloader();
         // TODO: this should change to ~/.rust-browser
@@ -71,7 +91,7 @@ impl Ultralight {
         }
     }
 
-    fn get_tab(&self) -> Option<&Tab> {
+    pub fn get_tab(&self) -> Option<&Tab> {
         if let Some(url) = self.current_tab.as_ref() {
             if let Some(tab) = self.tabs.get(url) {
                 Some(tab)
@@ -83,7 +103,7 @@ impl Ultralight {
         }
     }
 
-    fn get_tab_mut(&mut self) -> Option<&mut Tab> {
+    pub fn get_tab_mut(&mut self) -> Option<&mut Tab> {
         if let Some(url) = self.current_tab.as_mut() {
             if let Some(tab) = self.tabs.get_mut(url) {
                 Some(tab)
@@ -96,7 +116,7 @@ impl Ultralight {
     }
 }
 
-impl BrowserEngine for Ultralight {
+impl super::BrowserEngine for UltralightInner {
     fn new(width: u32, height: u32) -> Self {
         Self::new(width, height)
     }
@@ -105,8 +125,12 @@ impl BrowserEngine for Ultralight {
         self.renderer.update()
     }
 
-    fn render(&self) {
-        self.renderer.render()
+    fn need_render(&self) -> bool {
+        self.get_tab().unwrap().view.needs_paint()
+    }
+
+    fn render(&mut self) {
+        self.renderer.render();
     }
 
     fn needs_render(&self) -> bool {
@@ -136,6 +160,16 @@ impl BrowserEngine for Ultralight {
         }
     }
 
+    fn get_image(&mut self) -> Option<Image<Handle>> {
+        let size = self.size();
+        let image = self.pixel_buffer()?;
+        Some(create_image(image, size.0, size.1, true))
+    }
+
+    fn get_title(&self) -> Option<String> {
+        self.get_tab()?.view.title().ok()
+    }
+
     fn get_url(&self) -> Option<String> {
         Some(self.current_tab.clone()?)
     }
@@ -158,16 +192,19 @@ impl BrowserEngine for Ultralight {
             let surface = view.surface().unwrap();
             view.load_url(url).unwrap();
 
+            let title = view.title().unwrap();
+
             // RGBA
             debug_assert!(surface.row_bytes() / self.width == 4);
 
             let tab = Tab {
-                url: url.to_owned(),
+                _title: title,
                 view,
                 surface,
+                last_view: create_empty_view(self.width, self.height),
             };
 
-            self.tabs.entry(tab.url.clone()).or_insert(tab);
+            self.tabs.entry(url.to_string()).or_insert(tab);
             self.current_tab = Some(url.to_owned());
         }
     }
@@ -271,83 +308,63 @@ impl BrowserEngine for Ultralight {
             mouse::Event::ButtonPressed(mouse::Button::Back) => Status::Ignored,
             mouse::Event::ButtonReleased(mouse::Button::Back) => Status::Ignored,
             mouse::Event::ButtonPressed(mouse::Button::Left) => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseDown,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::Left,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseDown,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::Left,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::ButtonReleased(mouse::Button::Left) => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseUp,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::Left,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseUp,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::Left,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::ButtonPressed(mouse::Button::Right) => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseDown,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::Right,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseDown,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::Right,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::ButtonReleased(mouse::Button::Right) => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseUp,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::Right,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseUp,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::Right,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::CursorMoved { position: _ } => {
-                self.tabs
-                    .get(&self.current_tab.to_owned().unwrap())
-                    .unwrap()
-                    .view
-                    .fire_mouse_event(
-                        MouseEvent::new(
-                            ul_next::event::MouseEventType::MouseMoved,
-                            point.x as i32,
-                            point.y as i32,
-                            ul_next::event::MouseButton::None,
-                        )
-                        .unwrap(),
-                    );
+                self.get_tab().unwrap().view.fire_mouse_event(
+                    MouseEvent::new(
+                        ul_next::event::MouseEventType::MouseMoved,
+                        point.x as i32,
+                        point.y as i32,
+                        ul_next::event::MouseButton::None,
+                    )
+                    .unwrap(),
+                );
                 Status::Captured
             }
             mouse::Event::WheelScrolled { delta } => self.scroll(delta),
@@ -463,8 +480,6 @@ fn iced_key_to_ultralight_key(
         Some(text) => &text.to_string(),
         None => "",
     };
-
-    println!("text {}", text);
 
     let creation_info = KeyEventCreationInfo {
         ty,

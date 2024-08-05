@@ -1,4 +1,9 @@
-use std::sync::{Arc, Mutex};
+use crate::engines::{self, BrowserEngine};
+#[cfg(feature = "webkit")]
+use engines::ultralight::Ultralight;
+
+use std::thread;
+use std::time::Duration;
 
 use crate::engines::{Commands, CommandsRecv, Engine};
 
@@ -17,37 +22,34 @@ impl Default for Config {
 }
 
 // Holds the State of the Browser Widgets
+#[derive(Clone)]
 pub struct State {
     config: Config,
-    engine: Arc<Mutex<Engine>>,
-}
-
-impl Clone for State {
-    fn clone(&self) -> Self {
-        State {
-            config: self.config.clone(),
-            engine: self.engine.clone(),
-        }
-    }
+    #[cfg(feature = "webkit")]
+    webengine: Ultralight,
 }
 
 impl State {
     pub fn new() -> Self {
-        let engine = Engine::new();
-        let config = Config::default();
-        engine.send(Commands::NewTab(config.start_page.clone()));
+        #[cfg(feature = "webkit")]
+        let webengine = Ultralight::new();
 
-        Self {
-            config,
-            engine: Arc::new(Mutex::new(engine)),
-        }
+        let config = Config::default();
+        webengine.0.lock().unwrap().new_tab(&config.start_page);
+
+        let bg_webengine = webengine.clone();
+        thread::spawn(move || loop {
+            bg_webengine.0.lock().unwrap().do_work();
+            thread::sleep(Duration::from_millis(150));
+        });
+
+        State { config, webengine }
     }
 }
 
 pub use nav_bar::nav_bar;
 pub mod nav_bar {
-
-    use super::{Commands, State};
+    use super::{BrowserEngine, State};
 
     use iced::widget::text_input;
     use iced::{
@@ -91,19 +93,19 @@ pub mod nav_bar {
         type Event = Event;
 
         fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
-            let engine = self.state.engine.lock().unwrap();
-
-            match event {
-                Event::Backward => engine.send(Commands::GoBackward),
-                Event::Forward => engine.send(Commands::GoForward),
-                Event::Refresh => engine.send(Commands::Refresh),
-                Event::Home => engine.send(Commands::GotoUrl(self.state.config.start_page.clone())),
-                Event::UrlChanged(url) => self.url = url,
-                Event::UrlPasted(url) => {
-                    engine.send(Commands::GotoUrl(url.clone()));
-                    self.url = url;
+            if let Ok(webengine) = self.state.webengine.0.lock() {
+                match event {
+                    Event::Backward => webengine.go_back(),
+                    Event::Forward => webengine.go_forward(),
+                    Event::Refresh => webengine.refresh(),
+                    Event::Home => webengine.goto_url(&self.state.config.start_page),
+                    Event::UrlChanged(url) => self.url = url,
+                    Event::UrlPasted(url) => {
+                        webengine.goto_url(&url);
+                        self.url = url;
+                    }
+                    Event::UrlSubmitted => webengine.goto_url(&self.url),
                 }
-                Event::UrlSubmitted => engine.send(Commands::GotoUrl(self.url.clone())),
             }
             None
         }
@@ -147,7 +149,7 @@ pub mod nav_bar {
 
 pub use browser_view::browser_view;
 pub mod browser_view {
-    use super::{Commands, CommandsRecv, State};
+    use super::{engines::create_empty_view, BrowserEngine, State};
 
     use iced::advanced::{
         self,
@@ -204,58 +206,34 @@ pub mod browser_view {
             cursor: mouse::Cursor,
             viewport: &Rectangle,
         ) {
-            let engine = self.0.engine.lock().unwrap();
+            let mut webengine = self.0.webengine.0.lock().unwrap();
+            // webengine.do_work();
 
-            let (w, h) = {
-                let current_size = if let CommandsRecv::Size(w, h) = engine.recv(Commands::Size) {
-                    (w, h)
-                } else {
-                    (800, 800)
+            let (current_size, allowed_size) = (webengine.size(), layout.bounds().size());
+            if current_size.0 != allowed_size.width as u32
+                || current_size.1 != allowed_size.height as u32
+            {
+                webengine.resize(allowed_size.width as u32, allowed_size.height as u32);
+                let image = match webengine.get_image() {
+                    Some(image) => image,
+                    None => create_empty_view(current_size.0, current_size.1),
                 };
-                let allowed_size = layout.bounds().size();
-                if current_size.0 == allowed_size.width as u32
-                    && current_size.1 == allowed_size.height as u32
-                {
-                    current_size
-                } else {
-                    engine.send(Commands::Resize(
-                        allowed_size.width as u32,
-                        allowed_size.height as u32,
-                    ));
-                    (allowed_size.width as u32, allowed_size.height as u32)
-                }
+                webengine.get_tab_mut().unwrap().last_view = image;
+            }
+
+            if webengine.need_render() {
+                webengine.render();
+                let image = match webengine.get_image() {
+                    Some(image) => image,
+                    None => create_empty_view(current_size.0, current_size.1),
+                };
+                webengine.get_tab_mut().unwrap().last_view = image;
             };
 
-            engine.send(Commands::DoWork);
-            if let CommandsRecv::NeedRender(need) = engine.recv(Commands::NeedRender) {
-                need.then(|| engine.send(Commands::Render));
-            }
-            let handle = match engine.recv(Commands::PixelBuffer) {
-                CommandsRecv::PixelBuffer(image) => {
-                    let image = bgr_to_rgb(image);
-                    Handle::from_pixels(w, h, image)
-                }
-                _ => {
-                    let palatte = theme.palette().background;
-                    let mut image: Vec<u8> = Vec::new();
-                    for _ in 0..((w * h) / 4) {
-                        image.push(palatte.r as u8);
-                        image.push(palatte.g as u8);
-                        image.push(palatte.b as u8);
-                        image.push(palatte.a as u8);
-                    }
-                    Handle::from_pixels(w, h, image)
-                }
-            };
+            let image = &webengine.get_tab().unwrap().last_view;
+
             <Image<Handle> as Widget<Message, Theme, Renderer>>::draw(
-                &Image::<Handle>::new(handle),
-                tree,
-                renderer,
-                theme,
-                style,
-                layout,
-                cursor,
-                viewport,
+                &image, tree, renderer, theme, style, layout, cursor, viewport,
             )
         }
 
@@ -285,27 +263,13 @@ pub mod browser_view {
             _shell: &mut Shell<'_, Message>,
             _viewport: &Rectangle,
         ) -> event::Status {
-            let engine = self.0.engine.lock().unwrap();
+            let mut webengine = self.0.webengine.0.lock().unwrap();
 
             match event {
-                Event::Keyboard(keyboard_event) => {
-                    if let CommandsRecv::Keyboard(status) =
-                        engine.recv(Commands::Keyboard(keyboard_event))
-                    {
-                        status
-                    } else {
-                        Status::Ignored
-                    }
-                }
+                Event::Keyboard(keyboard_event) => webengine.handle_keyboard_event(keyboard_event),
                 Event::Mouse(mouse_event) => {
                     if let Some(point) = cursor.position_in(layout.bounds()) {
-                        if let CommandsRecv::Mouse(status) =
-                            engine.recv(Commands::Mouse(point, mouse_event))
-                        {
-                            status
-                        } else {
-                            Status::Ignored
-                        }
+                        webengine.handle_mouse_event(point, mouse_event)
                     } else {
                         Status::Ignored
                     }
@@ -322,13 +286,5 @@ pub mod browser_view {
         fn from(widget: BrowserView) -> Self {
             Self::new(widget)
         }
-    }
-
-    fn bgr_to_rgb(image: Vec<u8>) -> Vec<u8> {
-        image
-            .chunks(4)
-            .map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
-            .flatten()
-            .collect()
     }
 }

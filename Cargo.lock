@@ -1303,6 +1303,7 @@ version = "0.1.0"
 dependencies = [
  "iced",
  "smol_str",
+ "tokio",
  "ul-next",
 ]
 
