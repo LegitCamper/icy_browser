@@ -192,7 +192,7 @@ impl super::BrowserEngine for Ultralight {
             view.set_change_cursor_callback(move |_view, cursor_update| {
                 *cb_cursor.write().unwrap() = match cursor_update {
                     Cursor::None => mouse::Interaction::Idle,
-                    Cursor::Pointer => mouse::Interaction::Pointer,
+                    Cursor::Pointer => mouse::Interaction::Idle,
                     Cursor::Hand => mouse::Interaction::Pointer,
                     Cursor::Grab => mouse::Interaction::Grab,
                     Cursor::VerticalText => mouse::Interaction::Text,

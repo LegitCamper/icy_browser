@@ -3,6 +3,16 @@ name = "icy_browser"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+opt-level = 3
+codegen-units = 1
+lto = "fat"
+strip = "debuginfo"
+panic = "abort"
+
+[build]
+rustflags = ["-Z", "threads=8"]
+
 [dependencies]
 iced = { version = "0.12.1", features = ["advanced", "image", "tokio", "lazy"] }
 smol_str = "0.2.2"
