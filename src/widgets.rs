@@ -1,4 +1,4 @@
-use crate::engines::{self, BrowserEngine, Engine};
+use crate::engines::{self, BrowserEngine};
 #[cfg(feature = "webkit")]
 use engines::ultralight::Ultralight;
 
@@ -22,20 +22,20 @@ impl Default for Config {
 #[derive(Clone)]
 pub struct State {
     config: Config,
-    webengine: Arc<Mutex<Engine>>,
+    #[cfg(feature = "webkit")]
+    webengine: Arc<Mutex<Ultralight>>,
 }
 
 impl State {
     // TODO: this should be generic
     pub fn new() -> Self {
-        #[cfg(feature = "webkit")]
-        let mut webengine = Engine::new::<Ultralight>();
-
         let config = Config::default();
+        let mut webengine = Ultralight::new(800, 800);
         webengine.new_tab(&config.start_page);
 
         State {
             config,
+            #[cfg(feature = "webkit")]
             webengine: Arc::new(Mutex::new(webengine)),
         }
     }
@@ -202,6 +202,7 @@ pub mod browser_view {
             viewport: &Rectangle,
         ) {
             let mut webengine = self.0.webengine.lock().unwrap();
+            webengine.do_work();
 
             let (current_size, allowed_size) = (webengine.size(), layout.bounds().size());
             if current_size.0 != allowed_size.width as u32
