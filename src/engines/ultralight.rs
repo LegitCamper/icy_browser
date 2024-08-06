@@ -172,6 +172,11 @@ impl super::BrowserEngine for Ultralight {
             // RGBA
             debug_assert!(surface.row_bytes() / self.width == 4);
 
+            // set callbacks
+            // view.set_change_title_callback(|_view, title| {
+            //     self.get_tab_mut().unwrap()._title = title.clone()
+            // });
+
             let tab = Tab {
                 _title: title,
                 view,
@@ -408,8 +413,9 @@ fn iced_key_to_ultralight_key(
                     keyboard::key::Named::F10 => (VirtualKeyCode::F10, 121),
                     keyboard::key::Named::F11 => (VirtualKeyCode::F11, 122),
                     keyboard::key::Named::F12 => (VirtualKeyCode::F12, 123),
-                    _ => (VirtualKeyCode::Unknown, 31),
+                    _ => return None,
                 },
+                #[cfg(windows)]
                 keyboard::Key::Character(key) => match key.as_str() {
                     "a" => (VirtualKeyCode::A, 65),
                     "b" => (VirtualKeyCode::B, 66),
@@ -440,12 +446,55 @@ fn iced_key_to_ultralight_key(
                     "," => (VirtualKeyCode::OemComma, 188),
                     "." => (VirtualKeyCode::OemPeriod, 190),
                     ";" => (VirtualKeyCode::OemPeriod, 186),
-                    _ => (VirtualKeyCode::C, 31),
+                    _ => return None,
                 },
-                keyboard::Key::Unidentified => (VirtualKeyCode::Unknown, 31),
+                #[cfg(unix)]
+                keyboard::Key::Character(key) => match key.as_str() {
+                    "1" => (VirtualKeyCode::Key1, 2),
+                    "2" => (VirtualKeyCode::Key2, 3),
+                    "3" => (VirtualKeyCode::Key3, 4),
+                    "4" => (VirtualKeyCode::Key4, 5),
+                    "5" => (VirtualKeyCode::Key5, 6),
+                    "6" => (VirtualKeyCode::Key6, 7),
+                    "7" => (VirtualKeyCode::Key7, 8),
+                    "8" => (VirtualKeyCode::Key8, 9),
+                    "9" => (VirtualKeyCode::Key9, 10),
+                    "0" => (VirtualKeyCode::Key0, 11),
+                    "a" => (VirtualKeyCode::A, 30),
+                    "b" => (VirtualKeyCode::B, 48),
+                    "c" => (VirtualKeyCode::C, 46),
+                    "d" => (VirtualKeyCode::D, 32),
+                    "e" => (VirtualKeyCode::E, 18),
+                    "f" => (VirtualKeyCode::F, 33),
+                    "g" => (VirtualKeyCode::G, 34),
+                    "h" => (VirtualKeyCode::H, 35),
+                    "i" => (VirtualKeyCode::I, 23),
+                    "j" => (VirtualKeyCode::J, 36),
+                    "k" => (VirtualKeyCode::K, 37),
+                    "l" => (VirtualKeyCode::L, 38),
+                    "m" => (VirtualKeyCode::M, 50),
+                    "n" => (VirtualKeyCode::N, 49),
+                    "o" => (VirtualKeyCode::O, 24),
+                    "p" => (VirtualKeyCode::P, 25),
+                    "q" => (VirtualKeyCode::Q, 16),
+                    "r" => (VirtualKeyCode::R, 19),
+                    "s" => (VirtualKeyCode::S, 31),
+                    "t" => (VirtualKeyCode::T, 20),
+                    "u" => (VirtualKeyCode::U, 22),
+                    "v" => (VirtualKeyCode::V, 47),
+                    "w" => (VirtualKeyCode::W, 17),
+                    "x" => (VirtualKeyCode::X, 47),
+                    "y" => (VirtualKeyCode::Y, 21),
+                    "z" => (VirtualKeyCode::Z, 44),
+                    "," => (VirtualKeyCode::OemComma, 51),
+                    "." => (VirtualKeyCode::OemPeriod, 52),
+                    ";" => (VirtualKeyCode::OemPeriod, 39),
+                    _ => return None,
+                },
+                keyboard::Key::Unidentified => return None,
             }
         } else {
-            (VirtualKeyCode::Unknown, 31)
+            return None;
         }
     };
 
@@ -463,6 +512,9 @@ fn iced_key_to_ultralight_key(
         unmodified_text: text,
         is_keypad: false,
         is_auto_repeat: false,
+        #[cfg(windows)]
+        is_system_key: true,
+        #[cfg(not(windows))]
         is_system_key: false,
     };
 

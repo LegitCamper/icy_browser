@@ -18,8 +18,3 @@ fn create_image(image: Vec<u8>, w: u32, h: u32, bgr: bool) -> Image<Handle> {
     let handle = Handle::from_pixels(w, h, image);
     Image::new(handle)
 }
-
-fn create_empty_view(w: u32, h: u32) -> Image<Handle> {
-    let image = vec![255; w as usize * h as usize];
-    create_image(image, w, h, false)
-}
