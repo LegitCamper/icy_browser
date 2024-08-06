@@ -1,6 +1,9 @@
-use iced::{widget::column, Sandbox, Settings, Theme};
+use iced::{executor, Command, Subscription};
+use iced::{widget::column, Application, Settings, Theme};
 
 use icy_browser::{browser_view, nav_bar, State};
+
+use std::time::Duration;
 
 fn main() -> Result<(), iced::Error> {
     Browser::run(Settings::default())
@@ -9,13 +12,18 @@ fn main() -> Result<(), iced::Error> {
 struct Browser(State);
 
 #[derive(Debug, Clone, Copy)]
-pub enum Message {}
+pub enum Message {
+    DoWork,
+}
 
-impl Sandbox for Browser {
+impl Application for Browser {
     type Message = Message;
+    type Executor = executor::Default;
+    type Flags = ();
+    type Theme = Theme;
 
-    fn new() -> Self {
-        Self(State::new())
+    fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
+        (Self(State::new()), Command::none())
     }
 
     fn title(&self) -> String {
@@ -26,7 +34,16 @@ impl Sandbox for Browser {
         Theme::Dark
     }
 
-    fn update(&mut self, _message: Self::Message) {}
+    fn subscription(&self) -> Subscription<Message> {
+        iced::time::every(Duration::from_millis(100)).map(move |_| Message::DoWork)
+    }
+
+    fn update(&mut self, message: Self::Message) -> Command<Message> {
+        match message {
+            Message::DoWork => self.0.do_work(),
+        }
+        Command::none()
+    }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
         let browser = browser_view(&self.0);
