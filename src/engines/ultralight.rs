@@ -3,7 +3,7 @@ use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
 use iced::Point;
 use smol_str::SmolStr;
-use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 use ul_next::event::{self, KeyEventCreationInfo};
 use ul_next::{
     config::Config,
@@ -12,6 +12,7 @@ use ul_next::{
     platform::{self, LogLevel, Logger},
     renderer::Renderer,
     view::{View, ViewConfig},
+    window::Cursor,
     Surface,
 };
 
@@ -23,9 +24,11 @@ impl Logger for UlLogger {
 }
 
 pub struct Tab {
-    _title: String,
-    view: View,
     surface: Surface,
+    view: View,
+    title: Arc<RwLock<String>>,
+    url: Arc<RwLock<String>>,
+    cursor: Arc<RwLock<mouse::Interaction>>,
 }
 
 pub struct Ultralight {
@@ -33,8 +36,8 @@ pub struct Ultralight {
     view_config: ViewConfig,
     width: u32,
     height: u32,
-    current_tab: Option<String>,
-    tabs: HashMap<String, Tab>,
+    current_tab: Option<u32>,
+    tabs: Vec<Tab>,
     last_view: Option<Vec<u8>>,
 }
 
@@ -60,32 +63,23 @@ impl Ultralight {
             view_config,
             width,
             height,
-            // mouse_loc: None,
             current_tab: None,
-            tabs: HashMap::new(),
+            tabs: Vec::new(),
             last_view: None,
         }
     }
 
     fn get_tab(&self) -> Option<&Tab> {
-        if let Some(url) = self.current_tab.as_ref() {
-            if let Some(tab) = self.tabs.get(url) {
-                Some(tab)
-            } else {
-                None
-            }
+        if let Some(index) = self.current_tab.as_ref() {
+            self.tabs.get(*index as usize)
         } else {
             None
         }
     }
 
     fn get_tab_mut(&mut self) -> Option<&mut Tab> {
-        if let Some(url) = self.current_tab.as_mut() {
-            if let Some(tab) = self.tabs.get_mut(url) {
-                Some(tab)
-            } else {
-                None
-            }
+        if let Some(index) = self.current_tab.as_ref() {
+            self.tabs.get_mut(*index as usize)
         } else {
             None
         }
@@ -116,8 +110,8 @@ impl super::BrowserEngine for Ultralight {
     fn resize(&mut self, width: u32, height: u32) {
         (self.width, self.height) = (width, height);
         self.tabs.iter().for_each(|tab| {
-            tab.1.view.resize(width, height);
-            tab.1.surface.resize(width, height);
+            tab.view.resize(width, height);
+            tab.surface.resize(width, height);
         })
     }
 
@@ -141,12 +135,16 @@ impl super::BrowserEngine for Ultralight {
         self.last_view.clone()
     }
 
+    fn get_cursor(&self) -> mouse::Interaction {
+        *self.get_tab().unwrap().cursor.read().unwrap()
+    }
+
     fn get_title(&self) -> Option<String> {
         self.get_tab()?.view.title().ok()
     }
 
     fn get_url(&self) -> Option<String> {
-        Some(self.current_tab.clone()?)
+        Some(self.get_tab()?.url.read().ok()?.clone())
     }
 
     fn goto_url(&self, url: &str) {
@@ -158,7 +156,13 @@ impl super::BrowserEngine for Ultralight {
     }
 
     fn new_tab(&mut self, url: &str) {
-        if !self.tabs.contains_key(url) {
+        if self
+            .tabs
+            .iter()
+            .filter(|tab| *tab.url.read().unwrap() == *url)
+            .count()
+            == 0
+        {
             let view = self
                 .renderer
                 .create_view(self.width, self.height, &self.view_config, None)
@@ -167,33 +171,65 @@ impl super::BrowserEngine for Ultralight {
             let surface = view.surface().unwrap();
             view.load_url(url).unwrap();
 
-            let title = view.title().unwrap();
-
             // RGBA
             debug_assert!(surface.row_bytes() / self.width == 4);
 
             // set callbacks
-            // view.set_change_title_callback(|_view, title| {
-            //     self.get_tab_mut().unwrap()._title = title.clone()
-            // });
+            let site_url = Arc::new(RwLock::new(url.to_string()));
+            let cb_url = site_url.clone();
+            view.set_change_url_callback(move |_view, url| {
+                *cb_url.write().unwrap() = url;
+            });
+
+            let title = Arc::new(RwLock::new(view.title().unwrap()));
+            let cb_title = title.clone();
+            view.set_change_title_callback(move |_view, title| {
+                *cb_title.write().unwrap() = title;
+            });
+
+            let cursor = Arc::new(RwLock::new(mouse::Interaction::Idle));
+            let cb_cursor = cursor.clone();
+            view.set_change_cursor_callback(move |_view, cursor_update| {
+                *cb_cursor.write().unwrap() = match cursor_update {
+                    Cursor::None => mouse::Interaction::Idle,
+                    Cursor::Pointer => mouse::Interaction::Pointer,
+                    Cursor::Hand => mouse::Interaction::Pointer,
+                    Cursor::Grab => mouse::Interaction::Grab,
+                    Cursor::VerticalText => mouse::Interaction::Text,
+                    Cursor::IBeam => mouse::Interaction::Text,
+                    Cursor::Cross => mouse::Interaction::Crosshair,
+                    Cursor::Wait => mouse::Interaction::Working,
+                    Cursor::Grabbing => mouse::Interaction::Grab,
+                    Cursor::NorthSouthResize => mouse::Interaction::ResizingVertically,
+                    Cursor::EastWestResize => mouse::Interaction::ResizingHorizontally,
+                    Cursor::NotAllowed => mouse::Interaction::NotAllowed,
+                    Cursor::ZoomIn => mouse::Interaction::ZoomIn,
+                    Cursor::ZoomOut => mouse::Interaction::ZoomIn,
+                    _ => mouse::Interaction::Pointer,
+                };
+            });
 
             let tab = Tab {
-                _title: title,
+                title,
                 view,
                 surface,
+                url: site_url,
+                cursor,
             };
-            self.tabs.entry(url.to_string()).or_insert(tab);
-            self.current_tab = Some(url.to_owned());
+
+            self.tabs.push(tab);
+            self.current_tab = Some(self.tabs.len() as u32 - 1);
         }
     }
 
     fn goto_tab(&mut self, url: &str) -> Option<()> {
-        if self.tabs.contains_key(url) {
-            self.current_tab = Some(url.to_string());
-            return Some(());
-        } else {
-            return None;
+        for (index, tab) in self.tabs.iter().enumerate() {
+            if *tab.url.read().unwrap() == url {
+                self.current_tab = Some(index as u32);
+                return Some(());
+            }
         }
+        None
     }
 
     fn refresh(&self) {

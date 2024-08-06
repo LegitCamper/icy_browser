@@ -231,7 +231,7 @@ pub mod browser_view {
             _renderer: &Renderer,
         ) -> mouse::Interaction {
             if cursor.is_over(layout.bounds()) {
-                mouse::Interaction::Pointer
+                self.0.webengine.lock().unwrap().get_cursor()
             } else {
                 mouse::Interaction::Idle
             }

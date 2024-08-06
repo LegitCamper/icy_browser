@@ -1,5 +1,5 @@
 use iced::keyboard;
-use iced::mouse;
+use iced::mouse::{self, Interaction};
 use iced::{event::Status, Point};
 
 #[cfg(feature = "webkit")]
@@ -21,6 +21,7 @@ pub trait BrowserEngine {
     fn resize(&mut self, width: u32, height: u32);
     fn pixel_buffer(&mut self) -> Option<Vec<u8>>;
 
+    fn get_cursor(&self) -> Interaction;
     fn get_title(&self) -> Option<String>;
     fn get_url(&self) -> Option<String>;
     fn goto_url(&self, url: &str);
