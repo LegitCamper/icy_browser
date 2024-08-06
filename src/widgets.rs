@@ -142,7 +142,7 @@ pub mod nav_bar {
 
 pub use browser_view::browser_view;
 pub mod browser_view {
-    use crate::engines::create_image;
+    use crate::create_image;
 
     use super::{BrowserEngine, State};
 

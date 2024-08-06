@@ -35,7 +35,7 @@ pub struct Ultralight {
     height: u32,
     current_tab: Option<String>,
     tabs: HashMap<String, Tab>,
-    // last_view: Option<Vec<u8>>,
+    last_view: Option<Vec<u8>>,
 }
 
 impl Ultralight {
@@ -63,6 +63,7 @@ impl Ultralight {
             // mouse_loc: None,
             current_tab: None,
             tabs: HashMap::new(),
+            last_view: None,
         }
     }
 
@@ -120,20 +121,24 @@ impl super::BrowserEngine for Ultralight {
         })
     }
 
-    // TODO: this needs to cache the vec
     fn pixel_buffer(&mut self) -> Option<Vec<u8>> {
         // Get the raw pixels of the surface
         if self.need_render() {
             self.render();
 
+            let size = self.size();
+            let mut vec = Vec::new();
             if let Some(pixels_data) = self.get_tab_mut()?.surface.lock_pixels() {
-                let mut vec = Vec::new();
                 vec.extend_from_slice(&pixels_data);
-                return Some(vec);
+            } else {
+                let image = vec![255; size.0 as usize * size.1 as usize];
+                vec.extend_from_slice(&image)
             }
+            self.last_view = Some(vec.clone());
+            return Some(vec);
         }
-        let size = self.size();
-        Some(vec![255; size.0 as usize * size.1 as usize])
+
+        self.last_view.clone()
     }
 
     fn get_title(&self) -> Option<String> {
