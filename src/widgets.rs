@@ -202,7 +202,6 @@ pub mod browser_view {
             viewport: &Rectangle,
         ) {
             let mut webengine = self.0.webengine.lock().unwrap();
-            webengine.do_work();
 
             let (current_size, allowed_size) = (webengine.size(), layout.bounds().size());
             if current_size.0 != allowed_size.width as u32

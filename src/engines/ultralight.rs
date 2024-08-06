@@ -134,8 +134,8 @@ impl super::BrowserEngine for Ultralight {
                 let image = vec![255; size.0 as usize * size.1 as usize];
                 vec.extend_from_slice(&image)
             }
-            self.last_view = Some(vec.clone());
-            return Some(vec);
+            self.last_view = Some(vec);
+            return Some(self.last_view.clone()?);
         }
 
         self.last_view.clone()

@@ -91,6 +91,8 @@ impl Engine {
             let mut engine = E::new();
 
             loop {
+                engine.do_work();
+
                 if let Ok(command) = thread_reciever.recv() {
                     match command {
                         SendCommand::DoWork => engine.do_work(),
