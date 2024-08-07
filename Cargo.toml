@@ -15,8 +15,9 @@ rustflags = ["-Z", "threads=8"]
 
 [dependencies]
 iced = { version = "0.12.1", features = ["advanced", "image", "tokio", "lazy"] }
+iced_aw = { version = "0.9.3", features = ["tab_bar", "icons"] }
+# reqwest = { version = "0.12.5", features = ["blocking"] }
 smol_str = "0.2.2"
-tokio = { version = "1.39.2", features = ["time"] }
 ul-next = { version = "0.2.0", optional = true }
 
 [features]

@@ -31,6 +31,15 @@ pub struct Tab {
     cursor: Arc<RwLock<mouse::Interaction>>,
 }
 
+impl From<&Tab> for super::Tab {
+    fn from(value: &Tab) -> Self {
+        Self {
+            url: value.url.read().unwrap().to_string(),
+            title: value.title.read().unwrap().to_string(),
+        }
+    }
+}
+
 pub struct Ultralight {
     renderer: Renderer,
     view_config: ViewConfig,
@@ -155,6 +164,17 @@ impl super::BrowserEngine for Ultralight {
         !self.get_tab().unwrap().view.is_loading()
     }
 
+    fn get_tabs(&self) -> Vec<super::Tab> {
+        self.tabs
+            .iter()
+            .map(|tab| Into::<super::Tab>::into(tab))
+            .collect()
+    }
+
+    fn current_tab(&self) -> usize {
+        self.current_tab.unwrap() as usize
+    }
+
     fn new_tab(&mut self, url: &str) {
         if self
             .tabs
@@ -222,14 +242,14 @@ impl super::BrowserEngine for Ultralight {
         }
     }
 
-    fn goto_tab(&mut self, url: &str) -> Option<()> {
-        for (index, tab) in self.tabs.iter().enumerate() {
-            if *tab.url.read().unwrap() == url {
-                self.current_tab = Some(index as u32);
-                return Some(());
-            }
-        }
-        None
+    fn goto_tab(&mut self, idx: u32) -> Option<()> {
+        assert!(self.tabs.len() as u32 >= idx);
+        self.current_tab = Some(idx);
+        Some(())
+    }
+
+    fn close_tab(&mut self, idx: u32) {
+        self.tabs.remove(idx as usize);
     }
 
     fn refresh(&self) {

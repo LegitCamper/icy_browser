@@ -5,9 +5,20 @@ use engines::ultralight::Ultralight;
 use std::sync::{Arc, Mutex};
 
 mod browser_view;
+#[allow(unused)]
 pub use browser_view::{browser_view, BrowserView};
+
 mod nav_bar;
+#[allow(unused)]
 pub use nav_bar::{nav_bar, NavBar};
+
+mod tab_bar;
+#[allow(unused)]
+pub use tab_bar::{tab_bar, TabBar};
+
+#[allow(unused)]
+// pub use hover_text_input::HoverTextInput;
+mod hover_text_input;
 
 // Configures the Browser Widget
 #[derive(Debug, Clone)]

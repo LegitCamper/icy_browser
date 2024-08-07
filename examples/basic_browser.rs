@@ -1,12 +1,18 @@
 use iced::{executor, Command, Subscription};
 use iced::{widget::column, Application, Settings, Theme};
+use iced_aw::BOOTSTRAP_FONT_BYTES;
 
-use icy_browser::{browser_view, nav_bar, State};
+use icy_browser::{browser_view, nav_bar, tab_bar, State};
 
 use std::time::Duration;
 
 fn main() -> Result<(), iced::Error> {
-    Browser::run(Settings::default())
+    let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
+    let settings = Settings {
+        fonts: vec![bootstrap_font],
+        ..Default::default()
+    };
+    Browser::run(settings)
 }
 
 struct Browser(State);
@@ -46,9 +52,10 @@ impl Application for Browser {
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
-        let browser = browser_view(&self.0);
-        let nav_bar = nav_bar(&self.0).unwrap();
+        let tab_bar = tab_bar(&self.0);
+        let nav_bar = nav_bar(&self.0);
+        let browser_view = browser_view(&self.0);
 
-        column!(nav_bar, browser).into()
+        column!(tab_bar, nav_bar, browser_view).into()
     }
 }
