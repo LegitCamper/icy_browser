@@ -39,6 +39,12 @@ pub struct State<Engine: BrowserEngine> {
     webengine: Rc<RefCell<Engine>>,
 }
 
+impl<Engine: BrowserEngine> Default for State<Engine> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<Engine: BrowserEngine> Clone for State<Engine> {
     fn clone(&self) -> Self {
         Self {
