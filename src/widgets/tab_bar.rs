@@ -13,28 +13,27 @@ pub enum Event {
 }
 
 // helper function to create navigation bar
-pub fn tab_bar(state: &State) -> TabBar {
+pub fn tab_bar<Engine: BrowserEngine>(state: State<Engine>) -> TabBar<Engine> {
     TabBar::new(state)
 }
 
 // Simple navigation bar widget
-pub struct TabBar {
-    state: State,
+pub struct TabBar<Engine: BrowserEngine> {
+    state: State<Engine>,
 }
 
-impl TabBar {
-    pub fn new(state: &State) -> Self {
-        let state = state.clone();
+impl<Engine: BrowserEngine> TabBar<Engine> {
+    pub fn new(state: State<Engine>) -> Self {
         Self { state }
     }
 }
 
-impl<Message> Component<Message> for TabBar {
+impl<Message, Engine: BrowserEngine> Component<Message> for TabBar<Engine> {
     type State = ();
     type Event = Event;
 
     fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
-        let mut webengine = self.state.webengine.lock().unwrap();
+        let mut webengine = self.state.webengine.borrow_mut();
 
         match event {
             Event::TabSelected(index) => webengine.goto_tab(index as u32).unwrap(),
@@ -45,7 +44,7 @@ impl<Message> Component<Message> for TabBar {
     }
 
     fn view(&self, _state: &Self::State) -> Element<'_, Event, Theme> {
-        let webengine = self.state.webengine.lock().unwrap();
+        let webengine = self.state.webengine.borrow();
 
         let tab_bar = webengine
             .get_tabs()
@@ -78,8 +77,8 @@ impl<Message> Component<Message> for TabBar {
         }
     }
 }
-impl<'a, Message: 'a> From<TabBar> for Element<'a, Message> {
-    fn from(widget: TabBar) -> Self {
+impl<'a, Message: 'a, Engine: BrowserEngine + 'a> From<TabBar<Engine>> for Element<'a, Message> {
+    fn from(widget: TabBar<Engine>) -> Self {
         component(widget)
     }
 }

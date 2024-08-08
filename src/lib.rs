@@ -1,6 +1,11 @@
 use iced::widget::image::{Handle, Image};
 
-pub mod engines;
+mod engines;
+pub use engines::BrowserEngine;
+
+#[cfg(feature = "ultralight")]
+pub use engines::ultralight::Ultralight;
+
 mod widgets;
 pub use widgets::{browser_view, nav_bar, tab_bar, State};
 
@@ -8,8 +13,7 @@ fn bgr_to_rgb(image: Vec<u8>) -> Vec<u8> {
     assert_eq!(image.len() % 4, 0);
     image
         .chunks(4)
-        .map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
-        .flatten()
+        .flat_map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
         .collect()
 }
 

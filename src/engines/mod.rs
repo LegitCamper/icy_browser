@@ -6,11 +6,6 @@ use iced::{event::Status, Point};
 #[cfg(feature = "webkit")]
 pub mod ultralight;
 
-pub fn create_engine<B: BrowserEngine>() -> impl BrowserEngine {
-    #[cfg(feature = "webkit")]
-    <ultralight::Ultralight as BrowserEngine>::new()
-}
-
 #[derive(Debug, Clone)]
 pub struct Tab {
     pub url: String,

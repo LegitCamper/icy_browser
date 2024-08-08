@@ -17,21 +17,20 @@ pub enum Event {
 }
 
 // helper function to create navigation bar
-pub fn nav_bar(state: &State) -> NavBar {
+pub fn nav_bar<Engine: BrowserEngine>(state: State<Engine>) -> NavBar<Engine> {
     NavBar::new(state)
 }
 
 // Simple navigation bar widget
-pub struct NavBar {
-    state: State,
+pub struct NavBar<Engine: BrowserEngine> {
+    state: State<Engine>,
     url: String,
 }
 
-impl NavBar {
-    pub fn new(state: &State) -> Self {
-        let (_, tab) = state.webengine.lock().unwrap().current_tab();
+impl<Engine: BrowserEngine> NavBar<Engine> {
+    pub fn new(state: State<Engine>) -> Self {
+        let (_, tab) = state.webengine.borrow().current_tab();
 
-        let state = state.clone();
         Self {
             state,
             url: tab.url,
@@ -39,12 +38,12 @@ impl NavBar {
     }
 }
 
-impl<Message> Component<Message> for NavBar {
+impl<Message, Engine: BrowserEngine> Component<Message> for NavBar<Engine> {
     type State = ();
     type Event = Event;
 
     fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
-        let webengine = self.state.webengine.lock().unwrap();
+        let webengine = self.state.webengine.borrow();
 
         match event {
             Event::Backward => webengine.go_back(),
@@ -84,7 +83,7 @@ impl<Message> Component<Message> for NavBar {
             .center_x(),
             Space::new(Length::Fill, Length::Shrink),
             container(
-                text_input("https://site.com", &self.url.as_str())
+                text_input("https://site.com", &self.url)
                     .on_input(Event::UrlChanged)
                     .on_paste(Event::UrlPasted)
                     .on_submit(Event::UrlSubmitted)
@@ -105,8 +104,8 @@ impl<Message> Component<Message> for NavBar {
         }
     }
 }
-impl<'a, Message: 'a> From<NavBar> for Element<'a, Message> {
-    fn from(widget: NavBar) -> Self {
+impl<'a, Message: 'a, Engine: BrowserEngine + 'a> From<NavBar<Engine>> for Element<'a, Message> {
+    fn from(widget: NavBar<Engine>) -> Self {
         component(widget)
     }
 }

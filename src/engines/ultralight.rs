@@ -138,7 +138,7 @@ impl super::BrowserEngine for Ultralight {
                 vec.extend_from_slice(&image)
             }
             self.last_view = Some(vec);
-            return Some(self.last_view.clone()?);
+            return self.last_view.clone();
         }
 
         self.last_view.clone()
@@ -165,10 +165,7 @@ impl super::BrowserEngine for Ultralight {
     }
 
     fn get_tabs(&self) -> Vec<super::Tab> {
-        self.tabs
-            .iter()
-            .map(|tab| Into::<super::Tab>::into(tab))
-            .collect()
+        self.tabs.iter().map(Into::<super::Tab>::into).collect()
     }
 
     fn current_tab(&self) -> (usize, super::Tab) {
@@ -613,5 +610,5 @@ fn iced_key_to_ultralight_key(
         is_system_key: false,
     };
 
-    Some(event::KeyEvent::new(creation_info).ok()?)
+    event::KeyEvent::new(creation_info).ok()
 }

@@ -1,9 +1,12 @@
+// Simple browser with familiar browser widget with the ultralight(webkit) backend
+
 use iced::{executor, Command, Subscription};
 use iced::{widget::column, Application, Settings, Theme};
 use iced_aw::BOOTSTRAP_FONT_BYTES;
 
-use icy_browser::{browser_view, nav_bar, tab_bar, State};
+use icy_browser::{browser_view, nav_bar, tab_bar, State, Ultralight};
 
+use std::borrow::Borrow;
 use std::time::Duration;
 
 fn main() -> Result<(), iced::Error> {
@@ -15,7 +18,7 @@ fn main() -> Result<(), iced::Error> {
     Browser::run(settings)
 }
 
-struct Browser(State);
+struct Browser(State<Ultralight>);
 
 #[derive(Debug, Clone, Copy)]
 pub enum Message {
@@ -29,7 +32,7 @@ impl Application for Browser {
     type Theme = Theme;
 
     fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
-        (Self(State::new()), Command::none())
+        (Self(State::new_ultralight()), Command::none())
     }
 
     fn title(&self) -> String {
@@ -46,15 +49,15 @@ impl Application for Browser {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
-            Message::DoWork => self.0.do_work(),
+            Message::DoWork => self.0.borrow().do_work(),
         }
         Command::none()
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
-        let tab_bar = tab_bar(&self.0);
-        let nav_bar = nav_bar(&self.0);
-        let browser_view = browser_view(&self.0);
+        let tab_bar = tab_bar(self.0.clone());
+        let nav_bar = nav_bar(self.0.clone());
+        let browser_view = browser_view(self.0.clone());
 
         column!(tab_bar, nav_bar, browser_view).into()
     }

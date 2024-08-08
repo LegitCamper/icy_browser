@@ -1,8 +1,6 @@
 use crate::engines::{self, BrowserEngine};
-#[cfg(feature = "webkit")]
-use engines::ultralight::Ultralight;
 
-use std::sync::{Arc, Mutex};
+use std::{cell::RefCell, rc::Rc};
 
 mod browser_view;
 #[allow(unused)]
@@ -35,28 +33,41 @@ impl Default for Config {
 }
 
 // Holds the State of the Browser Widgets
-#[derive(Clone)]
-pub struct State {
+#[derive(Debug)]
+pub struct State<Engine: BrowserEngine> {
     config: Config,
-    #[cfg(feature = "webkit")]
-    webengine: Arc<Mutex<Ultralight>>,
+    webengine: Rc<RefCell<Engine>>,
 }
 
-impl State {
-    // TODO: this should be generic
+impl<Engine: BrowserEngine> Clone for State<Engine> {
+    fn clone(&self) -> Self {
+        Self {
+            config: self.config.clone(),
+            webengine: self.webengine.clone(),
+        }
+    }
+}
+
+impl<Engine: BrowserEngine> State<Engine> {
     pub fn new() -> Self {
         let config = Config::default();
-        let mut webengine = Ultralight::new(800, 800);
+        let mut webengine = Engine::new();
         webengine.new_tab(&config.start_page);
 
         State {
             config,
-            #[cfg(feature = "webkit")]
-            webengine: Arc::new(Mutex::new(webengine)),
+            webengine: Rc::new(RefCell::new(webengine)),
         }
     }
 
     pub fn do_work(&self) {
-        self.webengine.lock().unwrap().do_work()
+        self.webengine.borrow().do_work()
+    }
+}
+
+#[cfg(feature = "ultralight")]
+impl State<engines::ultralight::Ultralight> {
+    pub fn new_ultralight() -> State<engines::ultralight::Ultralight> {
+        State::new()
     }
 }
