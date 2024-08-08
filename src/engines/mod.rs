@@ -11,6 +11,7 @@ pub fn create_engine<B: BrowserEngine>() -> impl BrowserEngine {
     <ultralight::Ultralight as BrowserEngine>::new()
 }
 
+#[derive(Debug, Clone)]
 pub struct Tab {
     pub url: String,
     pub title: String,
@@ -37,7 +38,7 @@ pub trait BrowserEngine {
     fn new_tab(&mut self, url: &str);
     fn goto_tab(&mut self, idx: u32) -> Option<()>;
     fn get_tabs(&self) -> Vec<Tab>;
-    fn current_tab(&self) -> usize;
+    fn current_tab(&self) -> (usize, Tab);
     fn close_tab(&mut self, idx: u32);
 
     fn refresh(&self);

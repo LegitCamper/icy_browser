@@ -171,8 +171,10 @@ impl super::BrowserEngine for Ultralight {
             .collect()
     }
 
-    fn current_tab(&self) -> usize {
-        self.current_tab.unwrap() as usize
+    fn current_tab(&self) -> (usize, super::Tab) {
+        let idx = self.current_tab.unwrap() as usize;
+        let tab = self.tabs.get(idx).unwrap();
+        (idx, tab.into())
     }
 
     fn new_tab(&mut self, url: &str) {
@@ -440,6 +442,7 @@ fn iced_key_to_ultralight_key(
     let (virtual_key, native_key) = {
         if let Some(key) = key {
             match key {
+                #[cfg(windows)]
                 keyboard::Key::Named(key) => match key {
                     keyboard::key::Named::Control => (VirtualKeyCode::Control, 17),
                     keyboard::key::Named::Shift => (VirtualKeyCode::Shift, 16),
@@ -449,7 +452,7 @@ fn iced_key_to_ultralight_key(
                     keyboard::key::Named::ArrowDown => (VirtualKeyCode::Down, 40),
                     keyboard::key::Named::ArrowLeft => (VirtualKeyCode::Right, 37),
                     keyboard::key::Named::ArrowRight => (VirtualKeyCode::Up, 39),
-                    keyboard::key::Named::ArrowUp => (VirtualKeyCode::Up, 33),
+                    keyboard::key::Named::ArrowUp => (VirtualKeyCode::Left, 33),
                     keyboard::key::Named::End => (VirtualKeyCode::End, 35),
                     keyboard::key::Named::Home => (VirtualKeyCode::Home, 36),
                     keyboard::key::Named::Backspace => (VirtualKeyCode::Back, 8),
@@ -469,6 +472,37 @@ fn iced_key_to_ultralight_key(
                     keyboard::key::Named::F10 => (VirtualKeyCode::F10, 121),
                     keyboard::key::Named::F11 => (VirtualKeyCode::F11, 122),
                     keyboard::key::Named::F12 => (VirtualKeyCode::F12, 123),
+                    _ => return None,
+                },
+                #[cfg(unix)]
+                keyboard::Key::Named(key) => match key {
+                    keyboard::key::Named::Control => (VirtualKeyCode::Control, 29),
+                    keyboard::key::Named::Shift => (VirtualKeyCode::Shift, 42),
+                    keyboard::key::Named::Enter => (VirtualKeyCode::Return, 28),
+                    keyboard::key::Named::Tab => (VirtualKeyCode::Tab, 15),
+                    keyboard::key::Named::Space => (VirtualKeyCode::Space, 57),
+                    keyboard::key::Named::ArrowDown => (VirtualKeyCode::Down, 108),
+                    keyboard::key::Named::ArrowLeft => (VirtualKeyCode::Right, 106),
+                    keyboard::key::Named::ArrowRight => (VirtualKeyCode::Up, 103),
+                    keyboard::key::Named::ArrowUp => (VirtualKeyCode::Left, 105),
+                    keyboard::key::Named::End => (VirtualKeyCode::End, 107),
+                    keyboard::key::Named::Home => (VirtualKeyCode::Home, 102),
+                    keyboard::key::Named::Backspace => (VirtualKeyCode::Back, 14),
+                    keyboard::key::Named::Delete => (VirtualKeyCode::Delete, 11),
+                    keyboard::key::Named::Insert => (VirtualKeyCode::Insert, 110),
+                    keyboard::key::Named::Escape => (VirtualKeyCode::Escape, 1),
+                    keyboard::key::Named::F1 => (VirtualKeyCode::F1, 59),
+                    keyboard::key::Named::F2 => (VirtualKeyCode::F2, 60),
+                    keyboard::key::Named::F3 => (VirtualKeyCode::F3, 61),
+                    keyboard::key::Named::F4 => (VirtualKeyCode::F4, 62),
+                    keyboard::key::Named::F5 => (VirtualKeyCode::F5, 63),
+                    keyboard::key::Named::F6 => (VirtualKeyCode::F6, 64),
+                    keyboard::key::Named::F7 => (VirtualKeyCode::F7, 65),
+                    keyboard::key::Named::F8 => (VirtualKeyCode::F8, 66),
+                    keyboard::key::Named::F9 => (VirtualKeyCode::F9, 67),
+                    keyboard::key::Named::F10 => (VirtualKeyCode::F10, 68),
+                    keyboard::key::Named::F11 => (VirtualKeyCode::F11, 69),
+                    keyboard::key::Named::F12 => (VirtualKeyCode::F12, 70),
                     _ => return None,
                 },
                 #[cfg(windows)]
@@ -505,48 +539,51 @@ fn iced_key_to_ultralight_key(
                     _ => return None,
                 },
                 #[cfg(unix)]
-                keyboard::Key::Character(key) => match key.as_str() {
-                    "1" => (VirtualKeyCode::Key1, 2),
-                    "2" => (VirtualKeyCode::Key2, 3),
-                    "3" => (VirtualKeyCode::Key3, 4),
-                    "4" => (VirtualKeyCode::Key4, 5),
-                    "5" => (VirtualKeyCode::Key5, 6),
-                    "6" => (VirtualKeyCode::Key6, 7),
-                    "7" => (VirtualKeyCode::Key7, 8),
-                    "8" => (VirtualKeyCode::Key8, 9),
-                    "9" => (VirtualKeyCode::Key9, 10),
-                    "0" => (VirtualKeyCode::Key0, 11),
-                    "a" => (VirtualKeyCode::A, 30),
-                    "b" => (VirtualKeyCode::B, 48),
-                    "c" => (VirtualKeyCode::C, 46),
-                    "d" => (VirtualKeyCode::D, 32),
-                    "e" => (VirtualKeyCode::E, 18),
-                    "f" => (VirtualKeyCode::F, 33),
-                    "g" => (VirtualKeyCode::G, 34),
-                    "h" => (VirtualKeyCode::H, 35),
-                    "i" => (VirtualKeyCode::I, 23),
-                    "j" => (VirtualKeyCode::J, 36),
-                    "k" => (VirtualKeyCode::K, 37),
-                    "l" => (VirtualKeyCode::L, 38),
-                    "m" => (VirtualKeyCode::M, 50),
-                    "n" => (VirtualKeyCode::N, 49),
-                    "o" => (VirtualKeyCode::O, 24),
-                    "p" => (VirtualKeyCode::P, 25),
-                    "q" => (VirtualKeyCode::Q, 16),
-                    "r" => (VirtualKeyCode::R, 19),
-                    "s" => (VirtualKeyCode::S, 31),
-                    "t" => (VirtualKeyCode::T, 20),
-                    "u" => (VirtualKeyCode::U, 22),
-                    "v" => (VirtualKeyCode::V, 47),
-                    "w" => (VirtualKeyCode::W, 17),
-                    "x" => (VirtualKeyCode::X, 47),
-                    "y" => (VirtualKeyCode::Y, 21),
-                    "z" => (VirtualKeyCode::Z, 44),
-                    "," => (VirtualKeyCode::OemComma, 51),
-                    "." => (VirtualKeyCode::OemPeriod, 52),
-                    ";" => (VirtualKeyCode::OemPeriod, 39),
-                    _ => return None,
-                },
+                keyboard::Key::Character(key) => {
+                    println!("key: '{}'", key);
+                    match key.as_str() {
+                        "1" => (VirtualKeyCode::Key1, 2),
+                        "2" => (VirtualKeyCode::Key2, 3),
+                        "3" => (VirtualKeyCode::Key3, 4),
+                        "4" => (VirtualKeyCode::Key4, 5),
+                        "5" => (VirtualKeyCode::Key5, 6),
+                        "6" => (VirtualKeyCode::Key6, 7),
+                        "7" => (VirtualKeyCode::Key7, 8),
+                        "8" => (VirtualKeyCode::Key8, 9),
+                        "9" => (VirtualKeyCode::Key9, 10),
+                        "0" => (VirtualKeyCode::Key0, 11),
+                        "a" => (VirtualKeyCode::A, 30),
+                        "b" => (VirtualKeyCode::B, 48),
+                        "c" => (VirtualKeyCode::C, 46),
+                        "d" => (VirtualKeyCode::D, 32),
+                        "e" => (VirtualKeyCode::E, 18),
+                        "f" => (VirtualKeyCode::F, 33),
+                        "g" => (VirtualKeyCode::G, 34),
+                        "h" => (VirtualKeyCode::H, 35),
+                        "i" => (VirtualKeyCode::I, 23),
+                        "j" => (VirtualKeyCode::J, 36),
+                        "k" => (VirtualKeyCode::K, 37),
+                        "l" => (VirtualKeyCode::L, 38),
+                        "m" => (VirtualKeyCode::M, 50),
+                        "n" => (VirtualKeyCode::N, 49),
+                        "o" => (VirtualKeyCode::O, 24),
+                        "p" => (VirtualKeyCode::P, 25),
+                        "q" => (VirtualKeyCode::Q, 16),
+                        "r" => (VirtualKeyCode::R, 19),
+                        "s" => (VirtualKeyCode::S, 31),
+                        "t" => (VirtualKeyCode::T, 20),
+                        "u" => (VirtualKeyCode::U, 22),
+                        "v" => (VirtualKeyCode::V, 47),
+                        "w" => (VirtualKeyCode::W, 17),
+                        "x" => (VirtualKeyCode::X, 47),
+                        "y" => (VirtualKeyCode::Y, 21),
+                        "z" => (VirtualKeyCode::Z, 44),
+                        "," => (VirtualKeyCode::OemComma, 51),
+                        "." => (VirtualKeyCode::OemPeriod, 52),
+                        ";" => (VirtualKeyCode::OemPeriod, 39),
+                        _ => return None,
+                    }
+                }
                 keyboard::Key::Unidentified => return None,
             }
         } else {
@@ -558,6 +595,8 @@ fn iced_key_to_ultralight_key(
         Some(text) => &text.to_string(),
         None => "",
     };
+
+    println!("text: {}", text);
 
     let creation_info = KeyEventCreationInfo {
         ty,

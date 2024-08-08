@@ -54,7 +54,7 @@ impl<Message> Component<Message> for TabBar {
                 let idx = tab_bar.size();
                 tab_bar.push(idx, TabLabel::Text(tab.title.to_owned()))
             })
-            .set_active_tab(&webengine.current_tab())
+            .set_active_tab(&webengine.current_tab().0)
             .on_close(Event::TabClosed)
             .tab_width(Length::Shrink)
             .spacing(5.0)

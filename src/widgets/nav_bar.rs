@@ -1,7 +1,7 @@
 use super::{BrowserEngine, State};
 
 use iced::widget::text_input;
-use iced::widget::{component, container, row, text, text::LineHeight, Button, Component, Space};
+use iced::widget::{component, container, row, text::LineHeight, Button, Component, Space};
 use iced::{self, theme::Theme, Element, Length, Size};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 
@@ -29,9 +29,13 @@ pub struct NavBar {
 
 impl NavBar {
     pub fn new(state: &State) -> Self {
+        let (_, tab) = state.webengine.lock().unwrap().current_tab();
+
         let state = state.clone();
-        let url = state.config.start_page.clone();
-        Self { state, url }
+        Self {
+            state,
+            url: tab.url,
+        }
     }
 }
 
@@ -41,6 +45,7 @@ impl<Message> Component<Message> for NavBar {
 
     fn update(&mut self, _state: &mut Self::State, event: Event) -> Option<Message> {
         let webengine = self.state.webengine.lock().unwrap();
+
         match event {
             Event::Backward => webengine.go_back(),
             Event::Forward => webengine.go_forward(),
