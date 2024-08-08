@@ -1,0 +1,46 @@
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+name: Build
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download system deps
+        run: sudo apt update -y && sudo apt install -y cmake
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/checkout@v3
+      - name: Check format
+        run: cargo fmt --all -- --check
+      - name: Check clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Build
+        run: cargo build --all-features
+      - name: Test
+        run: cargo test
+  verify_msrv:
+    name: Verify Minimum Supported Rust Version in Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download system deps
+        run: sudo apt update -y && sudo apt install -y cmake
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: actions/checkout@v3
+      - name: Install or use cached `cargo-msrv`
+        uses: baptiste0928/cargo-install@v2
+        with:
+          crate: cargo-msrv
+      - name: Verify Minimum Rust Version
+        run: cargo-msrv verify
