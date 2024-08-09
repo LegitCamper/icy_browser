@@ -1,8 +1,10 @@
 use super::{BrowserEngine, State};
 
-use iced::widget::text_input;
-use iced::widget::{component, container, row, text::LineHeight, Button, Component, Space};
-use iced::{self, theme::Theme, Element, Length, Size};
+use iced::widget::{
+    component, row, text::LineHeight, text_input, tooltip, tooltip::Position, Button, Component,
+    Space,
+};
+use iced::{theme::Theme, Element, Length, Size};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 
 #[derive(Debug, Clone)]
@@ -61,40 +63,39 @@ impl<Message, Engine: BrowserEngine> Component<Message> for NavBar<Engine> {
     }
 
     fn view(&self, _state: &Self::State) -> Element<'_, Event, Theme> {
-        row!(
-            container(row!(
-                container(
-                    Button::new(icon_to_text(Bootstrap::ChevronBarLeft)).on_press(Event::Backward)
-                )
-                .padding(2),
-                container(
-                    Button::new(icon_to_text(Bootstrap::ChevronBarRight)).on_press(Event::Forward)
-                )
-                .padding(2),
-                container(Button::new(icon_to_text(Bootstrap::HouseDoor)).on_press(Event::Home))
-                    .padding(2),
-                container(
-                    Button::new(icon_to_text(Bootstrap::ArrowCounterclockwise))
-                        .on_press(Event::Refresh)
-                )
-                .padding(2)
-            ))
-            .center_y()
-            .center_x(),
-            Space::new(Length::Fill, Length::Shrink),
-            container(
-                text_input("https://site.com", &self.url)
-                    .on_input(Event::UrlChanged)
-                    .on_paste(Event::UrlPasted)
-                    .on_submit(Event::UrlSubmitted)
-                    .line_height(LineHeight::Relative(2.0))
-            )
-            .padding(2)
-            .center_x()
-            .center_y(),
-            Space::new(Length::Fill, Length::Shrink),
-        )
-        .into()
+        let back = tooltip_helper(
+            Button::new(icon_to_text(Bootstrap::ChevronBarLeft))
+                .on_press(Event::Backward)
+                .into(),
+            "Go Back",
+        );
+        let forward = tooltip_helper(
+            Button::new(icon_to_text(Bootstrap::ChevronBarRight))
+                .on_press(Event::Forward)
+                .into(),
+            "Go Forward",
+        );
+        let home = tooltip_helper(
+            Button::new(icon_to_text(Bootstrap::HouseDoor))
+                .on_press(Event::Home)
+                .into(),
+            "Go Home",
+        );
+        let refresh = tooltip_helper(
+            Button::new(icon_to_text(Bootstrap::ArrowCounterclockwise))
+                .on_press(Event::Refresh)
+                .into(),
+            "Refresh",
+        );
+        let space = Space::new(Length::Fill, Length::Shrink);
+        let space2 = Space::new(Length::Fill, Length::Shrink);
+        let search = text_input("https://site.com", &self.url)
+            .on_input(Event::UrlChanged)
+            .on_paste(Event::UrlPasted)
+            .on_submit(Event::UrlSubmitted)
+            .line_height(LineHeight::Relative(2.0));
+
+        row!(back, forward, home, refresh, space, search, space2).into()
     }
 
     fn size_hint(&self) -> Size<Length> {
@@ -108,4 +109,13 @@ impl<'a, Message: 'a, Engine: BrowserEngine + 'a> From<NavBar<Engine>> for Eleme
     fn from(widget: NavBar<Engine>) -> Self {
         component(widget)
     }
+}
+
+fn tooltip_helper<'a, Message: 'a>(
+    element: Element<'a, Message>,
+    tooltip_str: &'a str,
+) -> Element<'a, Message> {
+    tooltip(element, tooltip_str, Position::Bottom)
+        .padding(5)
+        .into()
 }
