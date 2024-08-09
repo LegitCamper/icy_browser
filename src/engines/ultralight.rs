@@ -413,6 +413,7 @@ impl super::BrowserEngine for Ultralight {
     }
 }
 
+#[derive(PartialEq, Eq)]
 enum KeyPress {
     Press,
     Unpress,
@@ -425,7 +426,7 @@ fn iced_key_to_ultralight_key(
     modifiers: keyboard::Modifiers,
     text: Option<SmolStr>,
 ) -> Option<event::KeyEvent> {
-    let ty = match press {
+    let mut ty = match press {
         KeyPress::Press => event::KeyEventType::KeyDown,
         KeyPress::Unpress => event::KeyEventType::KeyUp,
     };
@@ -593,7 +594,12 @@ fn iced_key_to_ultralight_key(
         None => "",
     };
 
-    println!("text: {}", text);
+    // solution to char events being ignored:
+    // Note that only KeyEventType::Char events actually generate text in input fields.
+    // if text has char rewrite event type to char
+    if !text.is_empty() {
+        ty = event::KeyEventType::Char
+    }
 
     let creation_info = KeyEventCreationInfo {
         ty,

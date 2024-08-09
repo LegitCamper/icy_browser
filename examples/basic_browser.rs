@@ -1,4 +1,4 @@
-// Simple browser with familiar browser widget with the ultralight(webkit) backend
+// Simple browser with familiar browser widget with the ultralight(webkit) webengine as a backend
 
 use iced::{executor, Command, Subscription};
 use iced::{widget::column, Application, Settings, Theme};
