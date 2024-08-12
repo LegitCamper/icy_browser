@@ -7,7 +7,7 @@ pub use engines::BrowserEngine;
 pub use engines::ultralight::Ultralight;
 
 mod widgets;
-pub use widgets::{browser_view, nav_bar, tab_bar, State};
+pub use widgets::{browser_view, nav_bar, tab_bar, BrowserView, NavBar, State, TabBar};
 
 fn bgr_to_rgb(image: Vec<u8>) -> Vec<u8> {
     assert_eq!(image.len() % 4, 0);
