@@ -3,11 +3,10 @@
 use iced::{executor, Command, Subscription};
 use iced::{widget::column, Application, Settings, Theme};
 use iced_aw::BOOTSTRAP_FONT_BYTES;
-
-use icy_browser::{browser_view, nav_bar, tab_bar, BrowserView, NavBar, State, TabBar, Ultralight};
-
 use std::borrow::Borrow;
 use std::time::Duration;
+
+use icy_browser::{browser_view, nav_bar, tab_bar, BrowserView, NavBar, State, TabBar, Ultralight};
 
 fn main() -> Result<(), iced::Error> {
     let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
@@ -71,15 +70,9 @@ impl Application for Browser {
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
             Message::DoWork => self.state.borrow().do_work(),
-            Message::NavBar(nav_bar_message) => match self.nav_bar.update(nav_bar_message) {
-                nav_bar::Action::None => {}
-            },
-            Message::TabBar(tab_bar_message) => match self.tab_bar.update(tab_bar_message) {
-                tab_bar::Action::None => {}
-            },
-            Message::BrowserView(browser_view) => match self.browser_view.update(browser_view) {
-                browser_view::Action::None => {}
-            },
+            Message::NavBar(nav_bar_message) => self.nav_bar.update(nav_bar_message),
+            Message::TabBar(tab_bar_message) => self.tab_bar.update(tab_bar_message),
+            Message::BrowserView(browser_view) => self.browser_view.update(browser_view),
         }
         Command::none()
     }

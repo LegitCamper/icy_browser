@@ -1,6 +1,7 @@
-use crate::engines::{self, BrowserEngine};
-
 use std::{cell::RefCell, rc::Rc};
+use url::Url;
+
+use crate::engines::{self, BrowserEngine};
 
 pub mod browser_view;
 #[allow(unused)]
@@ -54,7 +55,7 @@ impl<Engine: BrowserEngine> State<Engine> {
     pub fn new() -> Self {
         let config = Config::default();
         let mut webengine = Engine::new();
-        webengine.new_tab(&config.start_page);
+        webengine.new_tab(&Url::parse(&config.start_page).unwrap());
 
         State {
             config,

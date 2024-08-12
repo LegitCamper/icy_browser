@@ -4,10 +4,9 @@ use iced::mouse::{self, ScrollDelta};
 use iced::Point;
 use smol_str::SmolStr;
 use std::sync::{Arc, RwLock};
-use ul_next::event::{self, KeyEventCreationInfo};
 use ul_next::{
     config::Config,
-    event::{MouseEvent, ScrollEvent},
+    event::{self, KeyEventCreationInfo, MouseEvent, ScrollEvent},
     key_code::VirtualKeyCode,
     platform::{self, LogLevel, Logger},
     renderer::Renderer,
@@ -15,6 +14,7 @@ use ul_next::{
     window::Cursor,
     Surface,
 };
+use url::Url;
 
 struct UlLogger;
 impl Logger for UlLogger {
@@ -34,7 +34,7 @@ pub struct Tab {
 impl From<&Tab> for super::Tab {
     fn from(value: &Tab) -> Self {
         Self {
-            url: value.url.read().unwrap().to_string(),
+            url: Url::parse(value.url.read().unwrap().as_str()).unwrap(),
             title: value.title.read().unwrap().to_string(),
         }
     }
@@ -152,12 +152,12 @@ impl super::BrowserEngine for Ultralight {
         self.get_tab()?.view.title().ok()
     }
 
-    fn get_url(&self) -> Option<String> {
-        Some(self.get_tab()?.url.read().ok()?.clone())
+    fn get_url(&self) -> Option<Url> {
+        Some(Url::parse(self.get_tab()?.url.read().ok()?.clone().as_str()).ok()?)
     }
 
-    fn goto_url(&self, url: &str) {
-        self.get_tab().unwrap().view.load_url(url).unwrap();
+    fn goto_url(&self, url: &Url) {
+        self.get_tab().unwrap().view.load_url(url.as_ref()).unwrap();
     }
 
     fn has_loaded(&self) -> bool {
@@ -174,11 +174,11 @@ impl super::BrowserEngine for Ultralight {
         (idx, tab.into())
     }
 
-    fn new_tab(&mut self, url: &str) {
+    fn new_tab(&mut self, url: &Url) {
         if self
             .tabs
             .iter()
-            .filter(|tab| *tab.url.read().unwrap() == *url)
+            .filter(|tab| *tab.url.read().unwrap() == *url.as_ref())
             .count()
             == 0
         {
@@ -188,7 +188,7 @@ impl super::BrowserEngine for Ultralight {
                 .unwrap();
 
             let surface = view.surface().unwrap();
-            view.load_url(url).unwrap();
+            view.load_url(url.as_ref()).unwrap();
 
             // RGBA
             debug_assert!(surface.row_bytes() / self.width == 4);

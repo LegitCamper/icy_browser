@@ -2,13 +2,10 @@ use iced::widget::{row, text::LineHeight, text_input, tooltip, tooltip::Position
 use iced::{Element, Length};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 use iced_on_focus_widget::hoverable;
+use url::Url;
 
 use super::{BrowserEngine, State};
-
-#[derive(Debug, Clone)]
-pub enum Action {
-    None,
-}
+use crate::to_url;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -42,33 +39,33 @@ impl<Engine: BrowserEngine> NavBar<Engine> {
         Self {
             search_focused: false,
             state,
-            url: tab.url,
+            url: tab.url.to_string(),
         }
     }
 
-    pub fn update(&mut self, message: Message) -> Action {
+    pub fn update(&mut self, message: Message) {
         let webengine = self.state.webengine.borrow();
 
         match message {
             Message::Backward => webengine.go_back(),
             Message::Forward => webengine.go_forward(),
             Message::Refresh => webengine.refresh(),
-            Message::Home => webengine.goto_url(&self.state.config.start_page),
+            Message::Home => {
+                webengine.goto_url(&Url::parse(&self.state.config.start_page).unwrap())
+            }
             Message::UrlChanged(url) => self.url = url,
             Message::UrlPasted(url) => {
-                webengine.goto_url(&url);
-                self.url = url;
+                self.url = url.clone();
+                webengine.goto_url(&to_url(&url).unwrap());
             }
-            Message::UrlSubmitted => webengine.goto_url(&self.url),
+            Message::UrlSubmitted => webengine.goto_url(&to_url(&self.url).unwrap()),
             Message::OnFocus => self.search_focused = true,
             Message::OnUnfocus => self.search_focused = false,
         }
 
         if !self.search_focused {
-            self.url = webengine.get_url().unwrap()
+            self.url = webengine.get_url().unwrap().as_ref().to_string()
         }
-
-        Action::None
     }
 
     pub fn view(&self) -> Element<Message> {
@@ -99,7 +96,7 @@ impl<Engine: BrowserEngine> NavBar<Engine> {
         let space = Space::new(Length::Fill, Length::Shrink);
         let space2 = Space::new(Length::Fill, Length::Shrink);
         let search = hoverable(
-            text_input("https://site.com", &self.url)
+            text_input("https://site.com", self.url.as_ref())
                 .on_input(Message::UrlChanged)
                 .on_paste(Message::UrlPasted)
                 .on_submit(Message::UrlSubmitted)

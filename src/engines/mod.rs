@@ -2,13 +2,14 @@ use iced::keyboard;
 use iced::mouse::{self, Interaction};
 // use iced::widget::image::{Handle, Image};
 use iced::{event::Status, Point};
+use url::Url;
 
 #[cfg(feature = "webkit")]
 pub mod ultralight;
 
 #[derive(Debug, Clone)]
 pub struct Tab {
-    pub url: String,
+    pub url: Url,
     pub title: String,
     // icon: Image<Handle>,
 }
@@ -27,10 +28,10 @@ pub trait BrowserEngine {
     fn get_cursor(&self) -> Interaction;
     // fn get_icon(&self) -> Image<Handle>;
     fn get_title(&self) -> Option<String>;
-    fn get_url(&self) -> Option<String>;
-    fn goto_url(&self, url: &str);
+    fn get_url(&self) -> Option<Url>;
+    fn goto_url(&self, url: &Url);
     fn has_loaded(&self) -> bool;
-    fn new_tab(&mut self, url: &str);
+    fn new_tab(&mut self, url: &Url);
     fn goto_tab(&mut self, idx: u32) -> Option<()>;
     fn get_tabs(&self) -> Vec<Tab>;
     fn current_tab(&self) -> (usize, Tab);

@@ -1,4 +1,5 @@
 use iced::widget::image::{Handle, Image};
+use url::{ParseError, Url};
 
 mod engines;
 pub use engines::BrowserEngine;
@@ -8,6 +9,21 @@ pub use engines::ultralight::Ultralight;
 
 mod widgets;
 pub use widgets::{browser_view, nav_bar, tab_bar, BrowserView, NavBar, State, TabBar};
+
+fn to_url(url: &str) -> Option<Url> {
+    match Url::parse(url) {
+        Ok(url) => Some(url),
+        Err(error) => {
+            if let ParseError::RelativeUrlWithoutBase = error {
+                let mut base = String::from("https://");
+                base.push_str(url);
+                Url::parse(&base).ok()
+            } else {
+                None
+            }
+        }
+    }
+}
 
 fn bgr_to_rgb(image: Vec<u8>) -> Vec<u8> {
     assert_eq!(image.len() % 4, 0);

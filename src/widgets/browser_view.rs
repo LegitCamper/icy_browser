@@ -23,9 +23,8 @@ impl<Engine: BrowserEngine> BrowserView<Engine> {
         Self(state)
     }
 
-    pub fn update(&mut self, message: Message) -> Action {
+    pub fn update(&mut self, message: Message) {
         match message {}
-        Action::None
     }
 
     pub fn view(&self) -> Element<Message> {

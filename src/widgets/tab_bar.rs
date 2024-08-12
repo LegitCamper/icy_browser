@@ -2,13 +2,9 @@ use iced::widget::{row, tooltip, Button};
 use iced::{self, Element, Length};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 use iced_aw::{TabBar as TB, TabLabel};
+use url::Url;
 
 use super::{BrowserEngine, State};
-
-#[derive(Debug, Clone)]
-pub enum Action {
-    None,
-}
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -32,16 +28,16 @@ impl<Engine: BrowserEngine> TabBar<Engine> {
         Self { state }
     }
 
-    pub fn update(&mut self, event: Message) -> Action {
+    pub fn update(&mut self, event: Message) {
         let mut webengine = self.state.webengine.borrow_mut();
 
         match event {
             Message::TabSelected(index) => webengine.goto_tab(index as u32).unwrap(),
             Message::TabClosed(index) => webengine.close_tab(index as u32),
-            Message::NewTab => webengine.new_tab(&self.state.config.start_page),
+            Message::NewTab => {
+                webengine.new_tab(&Url::parse(&self.state.config.start_page).unwrap())
+            }
         }
-
-        Action::None
     }
 
     pub fn view(&self) -> Element<Message> {
