@@ -2,9 +2,8 @@ use iced::widget::{row, tooltip, Button};
 use iced::{self, Element, Length};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 use iced_aw::{TabBar as TB, TabLabel};
-use url::Url;
 
-use super::{BrowserEngine, State};
+use crate::engines::Tab;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -14,43 +13,39 @@ pub enum Message {
 }
 
 // helper function to create navigation bar
-pub fn tab_bar<Engine: BrowserEngine>(state: State<Engine>) -> TabBar<Engine> {
-    TabBar::new(state)
+pub fn tab_bar() -> TabBar {
+    TabBar::new()
 }
 
 // Simple navigation bar widget
-pub struct TabBar<Engine: BrowserEngine> {
-    state: State<Engine>,
+pub struct TabBar {
+    tabs: Vec<Tab>,
+    active_tab: usize,
 }
 
-impl<Engine: BrowserEngine> TabBar<Engine> {
-    pub fn new(state: State<Engine>) -> Self {
-        Self { state }
-    }
-
-    pub fn update(&mut self, event: Message) {
-        let mut webengine = self.state.webengine.borrow_mut();
-
-        match event {
-            Message::TabSelected(index) => webengine.goto_tab(index as u32).unwrap(),
-            Message::TabClosed(index) => webengine.close_tab(index as u32),
-            Message::NewTab => {
-                webengine.new_tab(&Url::parse(&self.state.config.start_page).unwrap())
-            }
+impl TabBar {
+    pub fn new() -> Self {
+        Self {
+            tabs: Vec::new(),
+            active_tab: 0,
         }
     }
 
-    pub fn view(&self) -> Element<Message> {
-        let webengine = self.state.webengine.borrow();
+    pub fn update(&mut self, message: Message) -> Message {
+        message
+    }
 
-        let tab_bar = webengine
-            .get_tabs()
+    pub fn view(&self) -> Element<Message> {
+        // let webengine = self.state.webengine.borrow();
+
+        let tab_bar = self
+            .tabs
             .iter()
             .fold(TB::new(Message::TabSelected), |tab_bar, tab| {
                 let idx = tab_bar.size();
                 tab_bar.push(idx, TabLabel::Text(tab.title.to_owned()))
             })
-            .set_active_tab(&webengine.current_tab().0)
+            .set_active_tab(&self.active_tab)
             .on_close(Message::TabClosed)
             .tab_width(Length::Shrink)
             .spacing(5.0)

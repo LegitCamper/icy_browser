@@ -51,7 +51,7 @@ pub struct Ultralight {
 }
 
 impl Ultralight {
-    pub fn new(width: u32, height: u32) -> Self {
+    pub fn new() -> Self {
         let config = Config::start().build().unwrap();
         platform::enable_platform_fontloader();
         // TODO: this should change to ~/.rust-browser
@@ -70,8 +70,8 @@ impl Ultralight {
         Self {
             renderer,
             view_config,
-            width,
-            height,
+            width: 800,
+            height: 800,
             current_tab: None,
             tabs: Vec::new(),
             last_view: None,
@@ -97,7 +97,7 @@ impl Ultralight {
 
 impl super::BrowserEngine for Ultralight {
     fn new() -> Self {
-        Ultralight::new(800, 800)
+        Ultralight::new()
     }
 
     fn do_work(&self) {

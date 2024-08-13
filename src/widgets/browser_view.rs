@@ -1,41 +1,52 @@
-use iced::Element;
-
-use super::{BrowserEngine, State};
+use iced::{keyboard, mouse, Element, Point};
 
 // helper function to create browser view
-pub fn browser_view<Engine: BrowserEngine>(state: State<Engine>) -> BrowserView<Engine> {
-    BrowserView::new(state)
+pub fn browser_view() -> BrowserView {
+    BrowserView::new()
 }
 
 #[derive(Debug, Clone)]
-pub enum Message {}
+pub enum Message {
+    WidgetKeyboardEvent(keyboard::Event),
+    WidgetMouseEvent(Point, mouse::Event),
+    // GetBounds,
+}
 
-#[derive(Debug, Clone)]
 pub enum Action {
+    // UpdateImage(Rectangle),
+    SendKeyboardEvent(keyboard::Event),
+    SendMouseEvent(Point, mouse::Event),
     None,
 }
 
 // Wrapper around BrowserView to keep consistency with other widgets
-pub struct BrowserView<Engine: BrowserEngine>(State<Engine>);
+pub struct BrowserView;
 
-impl<Engine: BrowserEngine> BrowserView<Engine> {
-    pub fn new(state: State<Engine>) -> Self {
-        Self(state)
+impl BrowserView {
+    pub fn new() -> Self {
+        Self
     }
 
-    pub fn update(&mut self, message: Message) {
-        match message {}
+    pub fn update(&mut self, message: Message) -> Action {
+        match message {
+            Message::WidgetKeyboardEvent(event) => Action::SendKeyboardEvent(event),
+            Message::WidgetMouseEvent(point, event) => Action::SendMouseEvent(point, event),
+            // Message::GetBounds => Action::UpdateImage(),
+        };
+
+        Action::None
     }
 
     pub fn view(&self) -> Element<Message> {
-        browser_view::BrowserView::new(self.0.clone()).into()
+        browser_view::BrowserView::new(
+            Box::new(Message::WidgetKeyboardEvent),
+            Box::new(Message::WidgetMouseEvent),
+        )
+        .into()
     }
 }
 
 mod browser_view {
-    use super::{BrowserEngine, State};
-    use crate::create_image;
-
     use iced::advanced::{
         self,
         graphics::core::event,
@@ -46,20 +57,33 @@ mod browser_view {
     };
     use iced::event::Status;
     use iced::widget::image::{Handle, Image};
-    use iced::{theme::Theme, Element, Event, Length, Rectangle, Size};
+    use iced::{theme::Theme, Element, Event, Length, Point, Rectangle, Size};
 
-    pub struct BrowserView<Engine: BrowserEngine>(State<Engine>);
+    use super::Message;
+    use crate::create_empty_view;
 
-    impl<Engine: BrowserEngine> BrowserView<Engine> {
-        pub fn new(state: State<Engine>) -> Self {
-            Self(state)
+    pub struct BrowserView<Message> {
+        image: Image<Handle>,
+        keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
+        mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
+    }
+
+    impl BrowserView<Message> {
+        pub fn new(
+            keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
+            mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
+        ) -> Self {
+            Self {
+                image: create_empty_view(800, 800),
+                keyboard_event,
+                mouse_event,
+            }
         }
     }
 
-    impl<Message, Renderer, Engine> Widget<Message, Theme, Renderer> for BrowserView<Engine>
+    impl<Message, Renderer> Widget<Message, Theme, Renderer> for BrowserView<Message>
     where
         Renderer: iced::advanced::image::Renderer<Handle = iced::advanced::image::Handle>,
-        Engine: BrowserEngine,
     {
         fn size(&self) -> Size<Length> {
             Size {
@@ -87,36 +111,16 @@ mod browser_view {
             cursor: mouse::Cursor,
             viewport: &Rectangle,
         ) {
-            let mut webengine = self.0.webengine.borrow_mut();
-
-            let (current_size, allowed_size) = (webengine.size(), layout.bounds().size());
-            if current_size.0 != allowed_size.width as u32
-                || current_size.1 != allowed_size.height as u32
-            {
-                webengine.resize(allowed_size.width as u32, allowed_size.height as u32);
-            }
-
-            let image_data = webengine.pixel_buffer().unwrap();
-            let image = create_image(image_data, current_size.0, current_size.1, true);
-
             <Image<Handle> as Widget<Message, Theme, Renderer>>::draw(
-                &image, tree, renderer, theme, style, layout, cursor, viewport,
+                &self.image,
+                tree,
+                renderer,
+                theme,
+                style,
+                layout,
+                cursor,
+                viewport,
             )
-        }
-
-        fn mouse_interaction(
-            &self,
-            _state: &Tree,
-            layout: Layout<'_>,
-            cursor: mouse::Cursor,
-            _viewport: &Rectangle,
-            _renderer: &Renderer,
-        ) -> mouse::Interaction {
-            if cursor.is_over(layout.bounds()) {
-                self.0.webengine.borrow().get_cursor()
-            } else {
-                mouse::Interaction::Idle
-            }
         }
 
         fn on_event(
@@ -127,16 +131,18 @@ mod browser_view {
             cursor: mouse::Cursor,
             _renderer: &Renderer,
             _clipboard: &mut dyn Clipboard,
-            _shell: &mut Shell<'_, Message>,
+            shell: &mut Shell<'_, Message>,
             _viewport: &Rectangle,
         ) -> event::Status {
-            let mut webengine = self.0.webengine.borrow_mut();
-
             match event {
-                Event::Keyboard(keyboard_event) => webengine.handle_keyboard_event(keyboard_event),
-                Event::Mouse(mouse_event) => {
+                Event::Keyboard(event) => {
+                    shell.publish((self.keyboard_event)(event));
+                    Status::Captured
+                }
+                Event::Mouse(event) => {
                     if let Some(point) = cursor.position_in(layout.bounds()) {
-                        webengine.handle_mouse_event(point, mouse_event)
+                        shell.publish((self.mouse_event)(point, event));
+                        Status::Captured
                     } else {
                         Status::Ignored
                     }
@@ -146,12 +152,11 @@ mod browser_view {
         }
     }
 
-    impl<'a, Message, Renderer, Engine: BrowserEngine + 'a> From<BrowserView<Engine>>
-        for Element<'a, Message, Theme, Renderer>
+    impl<'a, Message: 'a, Renderer> From<BrowserView<Message>> for Element<'a, Message, Theme, Renderer>
     where
         Renderer: advanced::Renderer + advanced::image::Renderer<Handle = advanced::image::Handle>,
     {
-        fn from(widget: BrowserView<Engine>) -> Self {
+        fn from(widget: BrowserView<Message>) -> Self {
             Self::new(widget)
         }
     }

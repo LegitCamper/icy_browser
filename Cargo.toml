@@ -20,8 +20,11 @@ rustflags = ["-Z", "threads=8"]
 iced = { version = "0.12.1", features = ["advanced", "image", "tokio", "lazy"]}
 iced_aw = { version = "0.9.3", features = ["tab_bar", "icons"] }
 iced_on_focus_widget = "0.1.0"
-# reqwest = { version = "0.12.5", features = ["blocking"] }
+reqwest = "0.12.5"
+serde = "1.0.207"
+serde_json = "1.0.124"
 smol_str = "0.2.2"
+tempfile = "3.12.0"
 ul-next = { version = "0.2.0", optional = true }
 url = "2.5.2"
 

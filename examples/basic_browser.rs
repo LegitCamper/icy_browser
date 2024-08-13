@@ -1,14 +1,13 @@
 // Simple browser with familiar browser widget with the ultralight(webkit) webengine as a backend
 
-use iced::{executor, Command, Subscription};
-use iced::{widget::column, Application, Settings, Theme};
+use iced::{executor, Application, Command, Settings, Subscription, Theme};
 use iced_aw::BOOTSTRAP_FONT_BYTES;
-use std::borrow::Borrow;
 use std::time::Duration;
 
-use icy_browser::{browser_view, nav_bar, tab_bar, BrowserView, NavBar, State, TabBar, Ultralight};
+use icy_browser::{browser_widgets, BrowserWidget, Ultralight};
 
 fn main() -> Result<(), iced::Error> {
+    // This imports `icons` for tab_bar and nav_bar
     let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
     let settings = Settings {
         fonts: vec![bootstrap_font],
@@ -18,17 +17,12 @@ fn main() -> Result<(), iced::Error> {
 }
 
 struct Browser {
-    state: State<Ultralight>,
-    tab_bar: TabBar<Ultralight>,
-    nav_bar: NavBar<Ultralight>,
-    browser_view: BrowserView<Ultralight>,
+    widgets: BrowserWidget<Ultralight>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    TabBar(tab_bar::Message),
-    NavBar(nav_bar::Message),
-    BrowserView(browser_view::Message),
+    BrowserWidget(browser_widgets::Message),
     DoWork,
 }
 
@@ -39,20 +33,14 @@ impl Application for Browser {
     type Theme = Theme;
 
     fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
-        let state = State::new_ultralight();
-        let tab_bar = tab_bar(state.clone());
-        let nav_bar = nav_bar(state.clone());
-        let browser_view = browser_view(state.clone());
+        let (widgets, command) = BrowserWidget::new_ultralight()
+            .with_homepage("https://duckduckgo.com")
+            .with_tab_bar()
+            .with_nav_bar()
+            // .with_browsesr_view()
+            .build();
 
-        (
-            Self {
-                state,
-                tab_bar,
-                nav_bar,
-                browser_view,
-            },
-            Command::none(),
-        )
+        (Self { widgets }, command.map(Message::BrowserWidget))
     }
 
     fn title(&self) -> String {
@@ -69,19 +57,15 @@ impl Application for Browser {
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
-            Message::DoWork => self.state.borrow().do_work(),
-            Message::NavBar(nav_bar_message) => self.nav_bar.update(nav_bar_message),
-            Message::TabBar(tab_bar_message) => self.tab_bar.update(tab_bar_message),
-            Message::BrowserView(browser_view) => self.browser_view.update(browser_view),
+            Message::BrowserWidget(msg) => self.widgets.update(msg).map(Message::BrowserWidget),
+            Message::DoWork => self
+                .widgets
+                .update(browser_widgets::Message::DoWork)
+                .map(Message::BrowserWidget),
         }
-        Command::none()
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
-        let tab_bar = self.tab_bar.view().map(Message::TabBar);
-        let nav_bar = self.nav_bar.view().map(Message::NavBar);
-        let browser_view = self.browser_view.view().map(Message::BrowserView);
-
-        column!(tab_bar, nav_bar, browser_view).into()
+        self.widgets.view().map(Message::BrowserWidget).into()
     }
 }

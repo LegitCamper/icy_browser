@@ -2,10 +2,6 @@ use iced::widget::{row, text::LineHeight, text_input, tooltip, tooltip::Position
 use iced::{Element, Length};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 use iced_on_focus_widget::hoverable;
-use url::Url;
-
-use super::{BrowserEngine, State};
-use crate::to_url;
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -16,55 +12,52 @@ pub enum Message {
     UrlChanged(String),
     UrlPasted(String),
     UrlSubmitted,
-    OnFocus,
     OnUnfocus,
 }
 
+pub enum Action {
+    GoBackward,
+    GoForward,
+    Refresh,
+    GoHome,
+    GoUrl(String),
+    None,
+}
+
 // helper function to create navigation bar
-pub fn nav_bar<Engine: BrowserEngine>(state: State<Engine>) -> NavBar<Engine> {
-    NavBar::new(state)
+pub fn nav_bar() -> NavBar {
+    NavBar::new()
 }
 
 // Simple navigation bar widget
-pub struct NavBar<Engine: BrowserEngine> {
-    search_focused: bool,
-    state: State<Engine>,
+pub struct NavBar {
     url: String,
 }
 
-impl<Engine: BrowserEngine> NavBar<Engine> {
-    pub fn new(state: State<Engine>) -> Self {
-        let (_, tab) = state.webengine.borrow().current_tab();
-
-        Self {
-            search_focused: false,
-            state,
-            url: tab.url.to_string(),
-        }
+impl NavBar {
+    pub fn new() -> Self {
+        Self { url: String::new() }
     }
 
-    pub fn update(&mut self, message: Message) {
-        let webengine = self.state.webengine.borrow();
-
+    pub fn update(&mut self, message: Message) -> Action {
         match message {
-            Message::Backward => webengine.go_back(),
-            Message::Forward => webengine.go_forward(),
-            Message::Refresh => webengine.refresh(),
-            Message::Home => {
-                webengine.goto_url(&Url::parse(&self.state.config.start_page).unwrap())
+            Message::Backward => Action::GoBackward,
+            Message::Forward => Action::GoForward,
+            Message::Refresh => Action::Refresh,
+            Message::Home => Action::GoHome,
+            Message::UrlChanged(url) => {
+                self.url = url.clone();
+                Action::GoUrl(url)
             }
-            Message::UrlChanged(url) => self.url = url,
             Message::UrlPasted(url) => {
                 self.url = url.clone();
-                webengine.goto_url(&to_url(&url).unwrap());
+                Action::GoUrl(url)
             }
-            Message::UrlSubmitted => webengine.goto_url(&to_url(&self.url).unwrap()),
-            Message::OnFocus => self.search_focused = true,
-            Message::OnUnfocus => self.search_focused = false,
-        }
-
-        if !self.search_focused {
-            self.url = webengine.get_url().unwrap().as_ref().to_string()
+            Message::UrlSubmitted => Action::GoUrl(self.url.clone()),
+            Message::OnUnfocus => {
+                // TODO: get new url and update it here?
+                Action::None
+            }
         }
     }
 
@@ -93,8 +86,8 @@ impl<Engine: BrowserEngine> NavBar<Engine> {
                 .into(),
             "Refresh",
         );
-        let space = Space::new(Length::Fill, Length::Shrink);
-        let space2 = Space::new(Length::Fill, Length::Shrink);
+        let space_left = Space::new(Length::Fill, Length::Shrink);
+        let space_right = Space::new(Length::Fill, Length::Shrink);
         let search = hoverable(
             text_input("https://site.com", self.url.as_ref())
                 .on_input(Message::UrlChanged)
@@ -103,10 +96,18 @@ impl<Engine: BrowserEngine> NavBar<Engine> {
                 .line_height(LineHeight::Relative(2.0))
                 .into(),
         )
-        .on_focus(Message::OnFocus)
         .on_unfocus(Message::OnUnfocus);
 
-        row!(back, forward, home, refresh, space, search, space2).into()
+        row!(
+            back,
+            forward,
+            home,
+            refresh,
+            space_left,
+            search,
+            space_right
+        )
+        .into()
     }
 }
 
