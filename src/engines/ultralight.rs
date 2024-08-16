@@ -1,4 +1,3 @@
-use iced::event::Status;
 use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
 use iced::Point;
@@ -15,6 +14,8 @@ use ul_next::{
     Surface,
 };
 use url::Url;
+
+use super::{BrowserEngine, PixelFormat};
 
 struct UlLogger;
 impl Logger for UlLogger {
@@ -47,18 +48,32 @@ pub struct Ultralight {
     height: u32,
     current_tab: Option<u32>,
     tabs: Vec<Tab>,
-    last_view: Option<Vec<u8>>,
 }
 
 impl Ultralight {
     pub fn new() -> Self {
         let config = Config::start().build().unwrap();
         platform::enable_platform_fontloader();
-        // TODO: this should change to ~/.rust-browser
+
+        #[cfg(not(debug_assertions))]
+        let mut home_dir = home_dir().unwrap();
+
+        #[cfg(not(debug_assertions))]
+        platform::enable_platform_filesystem(home_dir.as_path()).unwrap();
+
+        #[cfg(debug_assertions)]
         platform::enable_platform_filesystem(".").unwrap();
+
         platform::set_logger(UlLogger);
-        // TODO: this should change to ~/.rust-browser
-        platform::enable_default_logger("./log.txt").unwrap();
+
+        #[cfg(not(debug_assertions))]
+        home_dir.push("logs.txt");
+        #[cfg(not(debug_assertions))]
+        platform::enable_default_logger(home_dir.as_path()).unwrap();
+
+        #[cfg(debug_assertions)]
+        platform::enable_default_logger("./logs.txt").unwrap();
+
         let renderer = Renderer::create(config).unwrap();
         let view_config = ViewConfig::start()
             .initial_device_scale(1.0)
@@ -74,7 +89,6 @@ impl Ultralight {
             height: 800,
             current_tab: None,
             tabs: Vec::new(),
-            last_view: None,
         }
     }
 
@@ -95,7 +109,7 @@ impl Ultralight {
     }
 }
 
-impl super::BrowserEngine for Ultralight {
+impl BrowserEngine for Ultralight {
     fn new() -> Self {
         Ultralight::new()
     }
@@ -124,24 +138,20 @@ impl super::BrowserEngine for Ultralight {
         })
     }
 
-    fn pixel_buffer(&mut self) -> Option<Vec<u8>> {
-        // Get the raw pixels of the surface
-        if self.need_render() {
-            self.render();
+    fn pixel_buffer(&mut self) -> (PixelFormat, Vec<u8>) {
+        self.render();
 
-            let size = self.size();
-            let mut vec = Vec::new();
-            if let Some(pixels_data) = self.get_tab_mut()?.surface.lock_pixels() {
-                vec.extend_from_slice(&pixels_data);
-            } else {
+        let size = self.size();
+        let mut vec = Vec::new();
+        match self.get_tab_mut().unwrap().surface.lock_pixels() {
+            Some(pixel_data) => vec.extend_from_slice(&pixel_data),
+            None => {
                 let image = vec![255; size.0 as usize * size.1 as usize];
                 vec.extend_from_slice(&image)
             }
-            self.last_view = Some(vec);
-            return self.last_view.clone();
-        }
+        };
 
-        self.last_view.clone()
+        (PixelFormat::BGRA, vec)
     }
 
     fn get_cursor(&self) -> mouse::Interaction {
@@ -271,7 +281,7 @@ impl super::BrowserEngine for Ultralight {
         self.get_tab().unwrap().view.unfocus();
     }
 
-    fn scroll(&self, delta: ScrollDelta) -> Status {
+    fn scroll(&self, delta: ScrollDelta) {
         let scroll_event = match delta {
             ScrollDelta::Lines { x, y } => ScrollEvent::new(
                 ul_next::event::ScrollEventType::ScrollByPage,
@@ -287,10 +297,9 @@ impl super::BrowserEngine for Ultralight {
             .unwrap(),
         };
         self.get_tab().unwrap().view.fire_scroll_event(scroll_event);
-        Status::Captured
     }
 
-    fn handle_keyboard_event(&self, event: keyboard::Event) -> Status {
+    fn handle_keyboard_event(&self, event: keyboard::Event) {
         let key_event = match event {
             keyboard::Event::KeyPressed {
                 key,
@@ -320,26 +329,21 @@ impl super::BrowserEngine for Ultralight {
             }
         };
 
-        match key_event {
-            Some(key_event) => {
-                self.get_tab().unwrap().view.fire_key_event(key_event);
-
-                Status::Captured
-            }
-            None => Status::Ignored,
+        if let Some(key_event) = key_event {
+            self.get_tab().unwrap().view.fire_key_event(key_event);
         }
     }
 
-    fn handle_mouse_event(&mut self, point: Point, event: mouse::Event) -> Status {
+    fn handle_mouse_event(&mut self, point: Point, event: mouse::Event) {
         match event {
-            mouse::Event::ButtonPressed(mouse::Button::Other(_)) => Status::Ignored,
-            mouse::Event::ButtonReleased(mouse::Button::Other(_)) => Status::Ignored,
-            mouse::Event::ButtonPressed(mouse::Button::Middle) => Status::Ignored,
-            mouse::Event::ButtonReleased(mouse::Button::Middle) => Status::Ignored,
-            mouse::Event::ButtonPressed(mouse::Button::Forward) => Status::Ignored,
-            mouse::Event::ButtonReleased(mouse::Button::Forward) => Status::Ignored,
-            mouse::Event::ButtonPressed(mouse::Button::Back) => Status::Ignored,
-            mouse::Event::ButtonReleased(mouse::Button::Back) => Status::Ignored,
+            mouse::Event::ButtonPressed(mouse::Button::Other(_)) => (),
+            mouse::Event::ButtonReleased(mouse::Button::Other(_)) => (),
+            mouse::Event::ButtonPressed(mouse::Button::Middle) => (),
+            mouse::Event::ButtonReleased(mouse::Button::Middle) => (),
+            mouse::Event::ButtonPressed(mouse::Button::Forward) => (),
+            mouse::Event::ButtonReleased(mouse::Button::Forward) => (),
+            mouse::Event::ButtonPressed(mouse::Button::Back) => (),
+            mouse::Event::ButtonReleased(mouse::Button::Back) => (),
             mouse::Event::ButtonPressed(mouse::Button::Left) => {
                 self.get_tab().unwrap().view.fire_mouse_event(
                     MouseEvent::new(
@@ -350,7 +354,6 @@ impl super::BrowserEngine for Ultralight {
                     )
                     .unwrap(),
                 );
-                Status::Captured
             }
             mouse::Event::ButtonReleased(mouse::Button::Left) => {
                 self.get_tab().unwrap().view.fire_mouse_event(
@@ -362,7 +365,6 @@ impl super::BrowserEngine for Ultralight {
                     )
                     .unwrap(),
                 );
-                Status::Captured
             }
             mouse::Event::ButtonPressed(mouse::Button::Right) => {
                 self.get_tab().unwrap().view.fire_mouse_event(
@@ -374,7 +376,6 @@ impl super::BrowserEngine for Ultralight {
                     )
                     .unwrap(),
                 );
-                Status::Captured
             }
             mouse::Event::ButtonReleased(mouse::Button::Right) => {
                 self.get_tab().unwrap().view.fire_mouse_event(
@@ -386,7 +387,6 @@ impl super::BrowserEngine for Ultralight {
                     )
                     .unwrap(),
                 );
-                Status::Captured
             }
             mouse::Event::CursorMoved { position: _ } => {
                 self.get_tab().unwrap().view.fire_mouse_event(
@@ -398,16 +398,13 @@ impl super::BrowserEngine for Ultralight {
                     )
                     .unwrap(),
                 );
-                Status::Captured
             }
             mouse::Event::WheelScrolled { delta } => self.scroll(delta),
             mouse::Event::CursorLeft => {
                 self.unfocus();
-                Status::Captured
             }
             mouse::Event::CursorEntered => {
                 self.focus();
-                Status::Captured
             }
         }
     }

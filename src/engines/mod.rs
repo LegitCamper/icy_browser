@@ -1,7 +1,7 @@
 use iced::keyboard;
 use iced::mouse::{self, Interaction};
 // use iced::widget::image::{Handle, Image};
-use iced::{event::Status, Point};
+use iced::Point;
 use url::Url;
 
 #[cfg(feature = "webkit")]
@@ -14,6 +14,11 @@ pub struct Tab {
     // icon: Image<Handle>,
 }
 
+pub enum PixelFormat {
+    RGBA,
+    BGRA,
+}
+
 #[allow(unused)]
 pub trait BrowserEngine {
     fn new() -> Self;
@@ -23,7 +28,7 @@ pub trait BrowserEngine {
     fn render(&mut self);
     fn size(&self) -> (u32, u32);
     fn resize(&mut self, width: u32, height: u32);
-    fn pixel_buffer(&mut self) -> Option<Vec<u8>>;
+    fn pixel_buffer(&mut self) -> (PixelFormat, Vec<u8>);
 
     fn get_cursor(&self) -> Interaction;
     // fn get_icon(&self) -> Image<Handle>;
@@ -43,7 +48,7 @@ pub trait BrowserEngine {
     fn focus(&self);
     fn unfocus(&self);
 
-    fn scroll(&self, delta: mouse::ScrollDelta) -> Status;
-    fn handle_keyboard_event(&self, event: keyboard::Event) -> Status;
-    fn handle_mouse_event(&mut self, point: Point, event: mouse::Event) -> Status;
+    fn scroll(&self, delta: mouse::ScrollDelta);
+    fn handle_keyboard_event(&self, event: keyboard::Event);
+    fn handle_mouse_event(&mut self, point: Point, event: mouse::Event);
 }

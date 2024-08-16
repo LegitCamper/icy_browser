@@ -1,4 +1,4 @@
-// Simple browser with familiar browser widget with the ultralight(webkit) webengine as a backend
+// Simple browser with familiar browser widget and the ultralight(webkit) webengine as a backend
 
 use iced::{executor, Application, Command, Settings, Subscription, Theme};
 use iced_aw::BOOTSTRAP_FONT_BYTES;
@@ -7,7 +7,7 @@ use std::time::Duration;
 use icy_browser::{browser_widgets, BrowserWidget, Ultralight};
 
 fn main() -> Result<(), iced::Error> {
-    // This imports `icons` for tab_bar and nav_bar
+    // This imports `icons` for widgets
     let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
     let settings = Settings {
         fonts: vec![bootstrap_font],
@@ -23,7 +23,7 @@ struct Browser {
 #[derive(Debug, Clone)]
 pub enum Message {
     BrowserWidget(browser_widgets::Message),
-    DoWork,
+    DoBrowserWork,
 }
 
 impl Application for Browser {
@@ -33,14 +33,13 @@ impl Application for Browser {
     type Theme = Theme;
 
     fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
-        let (widgets, command) = BrowserWidget::new_ultralight()
-            .with_homepage("https://duckduckgo.com")
+        let widgets = BrowserWidget::new_with_ultralight()
             .with_tab_bar()
             .with_nav_bar()
-            // .with_browsesr_view()
+            .with_browsesr_view()
             .build();
 
-        (Self { widgets }, command.map(Message::BrowserWidget))
+        (Self { widgets }, Command::none())
     }
 
     fn title(&self) -> String {
@@ -52,17 +51,17 @@ impl Application for Browser {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced::time::every(Duration::from_millis(100)).map(move |_| Message::DoWork)
+        iced::time::every(Duration::from_millis(100)).map(move |_| Message::DoBrowserWork)
     }
 
     fn update(&mut self, message: Self::Message) -> Command<Message> {
         match message {
-            Message::BrowserWidget(msg) => self.widgets.update(msg).map(Message::BrowserWidget),
-            Message::DoWork => self
-                .widgets
-                .update(browser_widgets::Message::DoWork)
-                .map(Message::BrowserWidget),
+            Message::BrowserWidget(msg) => {
+                self.widgets.update(msg);
+            }
+            Message::DoBrowserWork => self.widgets.update(browser_widgets::Message::DoWork),
         }
+        Command::none()
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
