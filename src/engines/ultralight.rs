@@ -16,6 +16,7 @@ use ul_next::{
 use url::Url;
 
 use super::{BrowserEngine, PixelFormat};
+use crate::ViewBounds;
 
 struct UlLogger;
 impl Logger for UlLogger {
@@ -130,7 +131,8 @@ impl BrowserEngine for Ultralight {
         (self.width, self.height)
     }
 
-    fn resize(&mut self, width: u32, height: u32) {
+    fn resize(&mut self, size: ViewBounds) {
+        let (width, height) = (size.width, size.height);
         (self.width, self.height) = (width, height);
         self.tabs.iter().for_each(|tab| {
             tab.view.resize(width, height);

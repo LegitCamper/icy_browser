@@ -1,10 +1,10 @@
-use iced::{keyboard, mouse, widget::column, Element, Point, Rectangle};
+use iced::{keyboard, mouse, widget::column, Element, Point};
 use url::Url;
 
-use super::{nav_bar, tab_bar, BrowserView, NavBar, TabBar};
+use super::{nav_bar, tab_bar, BrowserView};
 use crate::{
     engines::{BrowserEngine, PixelFormat},
-    to_url, ImageInfo,
+    to_url, ImageInfo, ViewBounds,
 };
 
 #[cfg(feature = "ultralight")]
@@ -12,11 +12,6 @@ use crate::engines::ultralight::Ultralight;
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    // Pass messages to children
-    TabBar(tab_bar::Message),
-    NavBar(nav_bar::Message),
-
-    // Handle engine events & update widgets
     GoBackward,
     GoForward,
     Refresh,
@@ -26,23 +21,21 @@ pub enum Message {
     CloseTab(usize),
     CreateTab,
     UrlChanged(String),
-    UrlSubmitted(String),
     SendKeyboardEvent(keyboard::Event),
-    SendMouseEvnt(Point, mouse::Event),
-    UpdateBounds(Rectangle),
+    SendMouseEvent(Point, mouse::Event),
+    UpdateBounds(ViewBounds),
     DoWork,
-
-    None,
 }
 
 pub struct BrowserWidget<Engine: BrowserEngine> {
     engine: Option<Engine>,
     home: Url,
-    tab_bar: Option<TabBar>,
-    nav_bar: Option<NavBar>,
+    tab_bar: bool,
+    nav_bar: bool,
+    url: String,
     browser_view: bool,
     image: ImageInfo,
-    view_bounds: Rectangle,
+    view_bounds: ViewBounds,
 }
 
 impl<Engine: BrowserEngine> Default for BrowserWidget<Engine> {
@@ -51,11 +44,12 @@ impl<Engine: BrowserEngine> Default for BrowserWidget<Engine> {
         Self {
             engine: None,
             home,
-            tab_bar: None,
-            nav_bar: None,
+            tab_bar: false,
+            nav_bar: false,
+            url: String::new(),
             browser_view: false,
             image: ImageInfo::default(),
-            view_bounds: Rectangle::default(),
+            view_bounds: ViewBounds::default(),
         }
     }
 }
@@ -86,12 +80,12 @@ impl<Engine: BrowserEngine> BrowserWidget<Engine> {
     }
 
     pub fn with_tab_bar(mut self) -> Self {
-        self.tab_bar = Some(tab_bar());
+        self.tab_bar = true;
         self
     }
 
     pub fn with_nav_bar(mut self) -> Self {
-        self.nav_bar = Some(nav_bar(self.home.as_str()));
+        self.nav_bar = true;
         self
     }
 
@@ -100,118 +94,86 @@ impl<Engine: BrowserEngine> BrowserWidget<Engine> {
         self
     }
 
-    pub fn build(mut self) -> Self {
+    pub fn build(self) -> Self {
         assert_eq!(self.engine.is_none(), false);
 
-        // Create new tab for widgets to init with
-        if let Some(engine) = self.engine.as_mut() {
-            engine.new_tab(&self.home)
-        }
-
-        Self {
+        let mut build = Self {
             engine: self.engine,
             home: self.home,
             tab_bar: self.tab_bar,
             nav_bar: self.nav_bar,
+            url: self.url,
             browser_view: self.browser_view,
             image: self.image,
-            view_bounds: Rectangle::default(),
-        }
+            view_bounds: self.view_bounds,
+        };
+        build.update(Message::CreateTab);
+        build
     }
 
-    fn update_nav_bar_maybe(&mut self, message: nav_bar::Message) {
-        if let Some(nav_bar) = self.nav_bar.as_mut() {
-            nav_bar.update(message);
-        }
+    fn engine(&self) -> &Engine {
+        self.engine
+            .as_ref()
+            .expect("Browser was created without a backend engine!")
     }
 
-    fn update_tab_bar_maybe(&mut self, message: tab_bar::Message) {
-        if let Some(tab_bar) = self.tab_bar.as_mut() {
-            tab_bar.update(message);
-        }
+    fn engine_mut(&mut self) -> &mut Engine {
+        self.engine
+            .as_mut()
+            .expect("Browser was created without a backend engine!")
     }
 
     pub fn update(&mut self, message: Message) {
-        if let Some(engine) = self.engine.as_mut() {
-            if engine.need_render() {
-                let (format, image_data) = engine.pixel_buffer();
-                self.image = match format {
-                    PixelFormat::RGBA => ImageInfo::new(
-                        image_data,
-                        self.view_bounds.x as u32,
-                        self.view_bounds.y as u32,
-                    ),
-                    PixelFormat::BGRA => ImageInfo::new_from_bgr(
-                        image_data,
-                        self.view_bounds.x as u32,
-                        self.view_bounds.y as u32,
-                    ),
-                };
+        match message {
+            Message::DoWork => self.engine().do_work(),
+            Message::UpdateBounds(bounds) => {
+                self.view_bounds = bounds;
+                self.engine_mut().resize(bounds);
             }
+            Message::SendKeyboardEvent(event) => {
+                self.engine().handle_keyboard_event(event);
+            }
+            Message::SendMouseEvent(point, event) => {
+                self.engine_mut().handle_mouse_event(point, event);
+            }
+            Message::ChangeTab(index) => self.engine_mut().goto_tab(index as u32).unwrap(),
+            Message::CloseTab(index) => {
+                self.engine_mut().close_tab(index as u32);
+            }
+            Message::CreateTab => {
+                self.url = self.home.to_string();
+                let home = self.home.clone();
+                self.engine_mut().new_tab(&home);
+            }
+            Message::GoBackward => {
+                self.engine().go_back();
+                self.url = self.engine().get_url().unwrap().to_string();
+            }
+            Message::GoForward => {
+                self.engine().go_forward();
+                self.url = self.engine().get_url().unwrap().to_string();
+            }
+            Message::Refresh => self.engine().refresh(),
+            Message::GoHome => {
+                self.engine().goto_url(&self.home);
+            }
+            Message::GoUrl(url) => {
+                self.engine().goto_url(&to_url(&url).unwrap());
+            }
+            Message::UrlChanged(url) => self.url = url,
+        }
 
-            match message {
-                Message::UpdateBounds(bounds) => {
-                    let (current_size, allowed_size) = (engine.size(), bounds.size());
-                    if current_size.0 != allowed_size.width as u32
-                        || current_size.1 != allowed_size.height as u32
-                    {
-                        engine.resize(allowed_size.width as u32, allowed_size.height as u32);
-                        self.view_bounds = bounds;
-                    }
+        if self.engine().need_render() {
+            let (format, image_data) = self.engine_mut().pixel_buffer();
+            self.image = match format {
+                PixelFormat::RGBA => {
+                    ImageInfo::new(image_data, self.view_bounds.width, self.view_bounds.height)
                 }
-                Message::DoWork => engine.do_work(),
-                Message::SendKeyboardEvent(event) => {
-                    engine.handle_keyboard_event(event);
-                }
-                Message::SendMouseEvnt(point, event) => {
-                    engine.handle_mouse_event(point, event);
-                }
-                Message::ChangeTab(index) => engine.goto_tab(index as u32).unwrap(),
-                Message::CloseTab(index) => {
-                    engine.close_tab(index as u32);
-                    self.update_tab_bar_maybe(tab_bar::Message::TabClosed(index))
-                }
-                Message::CreateTab => {
-                    engine.new_tab(&Url::parse(self.home.as_str()).unwrap());
-                    self.update_nav_bar_maybe(nav_bar::Message::UrlChanged(self.home.to_string()))
-                }
-                Message::GoBackward => {
-                    engine.go_back();
-                    let url = engine.get_url().unwrap();
-                    self.update_nav_bar_maybe(nav_bar::Message::UrlChanged(url.to_string()))
-                }
-                Message::GoForward => {
-                    engine.go_forward();
-                    let url = engine.get_url().unwrap();
-                    self.update_nav_bar_maybe(nav_bar::Message::UrlChanged(url.to_string()))
-                }
-                Message::Refresh => engine.refresh(),
-                Message::GoHome => {
-                    engine.goto_url(&self.home);
-                    self.update_nav_bar_maybe(nav_bar::Message::UrlChanged(self.home.to_string()))
-                }
-                Message::GoUrl(url) => engine.goto_url(&to_url(&url).unwrap()),
-                Message::UrlChanged(url) => {
-                    self.update_nav_bar_maybe(nav_bar::Message::UrlChanged(url.to_string()))
-                }
-                Message::UrlSubmitted(url) => {
-                    if let Ok(url) = Url::parse(url.as_str()) {
-                        engine.goto_url(&url)
-                    }
-                }
-                Message::None => (),
-
-                // Relay messages to children
-                Message::TabBar(msg) => {
-                    if let Some(tab_bar) = self.tab_bar.as_mut() {
-                        tab_bar.update(msg);
-                    }
-                }
-                Message::NavBar(msg) => {
-                    if let Some(nav_bar) = self.nav_bar.as_mut() {
-                        nav_bar.update(msg);
-                    }
-                }
+                PixelFormat::BGRA => ImageInfo::new_from_bgr(
+                    image_data,
+                    self.view_bounds.width,
+                    self.view_bounds.height,
+                ),
             }
         }
     }
@@ -219,42 +181,23 @@ impl<Engine: BrowserEngine> BrowserWidget<Engine> {
     pub fn view(&self) -> Element<Message> {
         let mut column = column![];
 
-        if let Some(nav_bar) = self.nav_bar.as_ref() {
-            column = column.push(nav_bar.view())
+        if self.tab_bar {
+            let tabs = self.engine().get_tabs();
+            let (active_tab, _) = self.engine().current_tab();
+            column = column.push(tab_bar(tabs, active_tab))
         }
-        if let Some(tab_bar) = self.tab_bar.as_ref() {
-            column = column.push(tab_bar.view())
+        if self.nav_bar {
+            column = column.push(nav_bar(&self.url))
         }
-        if self.browser_view == true {
+        if self.browser_view {
             column = column.push(BrowserView::new(
                 &self.image,
                 Box::new(Message::UpdateBounds),
                 Box::new(Message::SendKeyboardEvent),
-                Box::new(Message::SendMouseEvnt),
+                Box::new(Message::SendMouseEvent),
             ))
         }
 
         column.into()
     }
-
-    // fn create_first_tab() -> Command<Message> {
-    //        iced::Task::future(async {
-    //            // Fetch a joke from the internet
-    //            let client = reqwest::Client::new();
-    //            let response: serde_json::Value = client
-    //                .get("https://icanhazdadjoke.com")
-    //                .header("Accept", "application/json")
-    //                .send()
-    //                .await
-    //                .unwrap()
-    //                .json()
-    //                .await
-    //                .unwrap();
-
-    //            // Parse the response
-    //            let joke = response["joke"].as_str().unwrap();
-
-    //            // Return the joke as a message
-    //            Message::Initialize(joke.to_owned())
-    //        })
 }

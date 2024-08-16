@@ -4,6 +4,8 @@ use iced::mouse::{self, Interaction};
 use iced::Point;
 use url::Url;
 
+use crate::ViewBounds;
+
 #[cfg(feature = "webkit")]
 pub mod ultralight;
 
@@ -27,7 +29,7 @@ pub trait BrowserEngine {
     fn need_render(&self) -> bool;
     fn render(&mut self);
     fn size(&self) -> (u32, u32);
-    fn resize(&mut self, width: u32, height: u32);
+    fn resize(&mut self, size: ViewBounds);
     fn pixel_buffer(&mut self) -> (PixelFormat, Vec<u8>);
 
     fn get_cursor(&self) -> Interaction;
