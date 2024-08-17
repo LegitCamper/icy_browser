@@ -1,10 +1,10 @@
-use iced::{keyboard, mouse, widget::column, Element, Point};
+use iced::{keyboard, mouse, widget::column, Element, Point, Size};
 use url::Url;
 
 use super::{nav_bar, tab_bar, BrowserView};
 use crate::{
     engines::{BrowserEngine, PixelFormat},
-    to_url, ImageInfo, ViewBounds,
+    to_url, ImageInfo,
 };
 
 #[cfg(feature = "ultralight")]
@@ -23,19 +23,19 @@ pub enum Message {
     UrlChanged(String),
     SendKeyboardEvent(keyboard::Event),
     SendMouseEvent(Point, mouse::Event),
-    UpdateBounds(ViewBounds),
+    UpdateBounds(Size),
     DoWork,
 }
 
 pub struct BrowserWidget<Engine: BrowserEngine> {
     engine: Option<Engine>,
     home: Url,
+    url: String,
     tab_bar: bool,
     nav_bar: bool,
-    url: String,
     browser_view: bool,
     image: ImageInfo,
-    view_bounds: ViewBounds,
+    view_bounds: Size,
 }
 
 impl<Engine: BrowserEngine> Default for BrowserWidget<Engine> {
@@ -44,12 +44,12 @@ impl<Engine: BrowserEngine> Default for BrowserWidget<Engine> {
         Self {
             engine: None,
             home,
+            url: String::new(),
             tab_bar: false,
             nav_bar: false,
-            url: String::new(),
             browser_view: false,
             image: ImageInfo::default(),
-            view_bounds: ViewBounds::default(),
+            view_bounds: Size::new(800., 800.),
         }
     }
 }
@@ -166,13 +166,15 @@ impl<Engine: BrowserEngine> BrowserWidget<Engine> {
         if self.engine().need_render() {
             let (format, image_data) = self.engine_mut().pixel_buffer();
             self.image = match format {
-                PixelFormat::RGBA => {
-                    ImageInfo::new(image_data, self.view_bounds.width, self.view_bounds.height)
-                }
+                PixelFormat::RGBA => ImageInfo::new(
+                    image_data,
+                    self.view_bounds.width as u32,
+                    self.view_bounds.height as u32,
+                ),
                 PixelFormat::BGRA => ImageInfo::new_from_bgr(
                     image_data,
-                    self.view_bounds.width,
-                    self.view_bounds.height,
+                    self.view_bounds.width as u32,
+                    self.view_bounds.height as u32,
                 ),
             }
         }

@@ -15,27 +15,6 @@ pub use engines::ultralight::Ultralight;
 mod widgets;
 pub use widgets::{browser_widgets, nav_bar, tab_bar, BrowserView, BrowserWidget};
 
-#[derive(Debug, Clone, Copy)]
-pub struct ViewBounds {
-    width: u32,
-    height: u32,
-}
-
-impl Default for ViewBounds {
-    fn default() -> Self {
-        Self {
-            width: 800,
-            height: 800,
-        }
-    }
-}
-
-impl ViewBounds {
-    pub fn new(width: u32, height: u32) -> Self {
-        Self { width, height }
-    }
-}
-
 // Image details for passing the view around
 #[derive(Debug, Clone)]
 pub struct ImageInfo {

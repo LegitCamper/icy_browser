@@ -1,6 +1,6 @@
 use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
-use iced::Point;
+use iced::{Point, Size};
 use smol_str::SmolStr;
 use std::sync::{Arc, RwLock};
 use ul_next::{
@@ -16,7 +16,6 @@ use ul_next::{
 use url::Url;
 
 use super::{BrowserEngine, PixelFormat};
-use crate::ViewBounds;
 
 struct UlLogger;
 impl Logger for UlLogger {
@@ -131,8 +130,8 @@ impl BrowserEngine for Ultralight {
         (self.width, self.height)
     }
 
-    fn resize(&mut self, size: ViewBounds) {
-        let (width, height) = (size.width, size.height);
+    fn resize(&mut self, size: Size) {
+        let (width, height) = (size.width as u32, size.height as u32);
         (self.width, self.height) = (width, height);
         self.tabs.iter().for_each(|tab| {
             tab.view.resize(width, height);
