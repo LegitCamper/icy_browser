@@ -15,6 +15,9 @@ use ul_next::{
 };
 use url::Url;
 
+#[cfg(not(debug_assertions))]
+use env_home::env_home_dir;
+
 use super::{BrowserEngine, PixelFormat};
 
 struct UlLogger;
@@ -56,8 +59,9 @@ impl Ultralight {
         platform::enable_platform_fontloader();
 
         #[cfg(not(debug_assertions))]
-        let mut home_dir = home_dir().unwrap();
-
+        let mut home_dir = env_home_dir().unwrap();
+        #[cfg(not(debug_assertions))]
+        home_dir.push(".icy_browser");
         #[cfg(not(debug_assertions))]
         platform::enable_platform_filesystem(home_dir.as_path()).unwrap();
 

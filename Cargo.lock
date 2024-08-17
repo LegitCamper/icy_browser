@@ -704,6 +704,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "env_home"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7f84e12ccf0a7ddc17a6c41c93326024c42920d7ee630d04950e6926645c0fe"
+
+[[package]]
 name = "equivalent"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1564,6 +1570,7 @@ name = "icy_browser"
 version = "0.1.0"
 dependencies = [
  "cmake",
+ "env_home",
  "iced",
  "iced_aw",
  "iced_on_focus_widget",

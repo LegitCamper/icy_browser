@@ -26,6 +26,7 @@ ultralight = ["ul-next"]
 # iced_core = { git = "https://github.com/iced-rs/iced", rev = "6734d183594ebf89b8e6c030ea69d53ecb6b72db" }
 
 [dependencies]
+env_home = "0.1.0"
 iced = { version = "0.12.*", features = ["advanced", "image", "tokio", "lazy"]}
 iced_aw = { version = "0.9.3", features = ["tab_bar", "icons"] }
 iced_on_focus_widget = "0.1.0"

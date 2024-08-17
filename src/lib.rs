@@ -1,9 +1,4 @@
 use iced::widget::image::{Handle, Image};
-use std::fs::{remove_file, File};
-use std::io::{self, copy, Write};
-
-use std::path::PathBuf;
-use tempfile::Builder;
 use url::{ParseError, Url};
 
 mod engines;
@@ -59,41 +54,6 @@ impl ImageInfo {
         let handle = Handle::from_pixels(self.width, self.height, self.pixels.clone());
         Image::new(handle)
     }
-}
-
-fn copy_bytes_to_file(name: &str, bytes: &[u8], mut path: PathBuf) -> Result<(), io::Error> {
-    path.push(name);
-    let _ = remove_file(path.clone()); // file already exists
-    let mut file = std::fs::File::create(&path)?;
-    file.write_all(&bytes[..])?;
-    Ok(())
-}
-
-// This function has to be called in a iced Command/Task future
-// if path is false, its downloaded to a temp dir
-async fn download_file(path: Option<PathBuf>, url: &str) -> Option<()> {
-    let tmp_dir = Builder::new().prefix("Rust-Browser_Cache").tempdir().ok()?;
-    let response = reqwest::get(url).await.ok()?;
-
-    let mut dest = {
-        let fname = response
-            .url()
-            .path_segments()
-            .and_then(|segments| segments.last())
-            .and_then(|name| if name.is_empty() { None } else { Some(name) })
-            .unwrap_or("tmp.bin");
-
-        let path = match path {
-            Some(path) => tmp_dir.path().join(path),
-            None => tmp_dir.path().join(fname),
-        };
-
-        File::create(path).ok()?
-    };
-
-    let content = response.text().await.ok()?;
-    copy(&mut content.as_bytes(), &mut dest).ok()?;
-    Some(())
 }
 
 fn to_url(url: &str) -> Option<Url> {
