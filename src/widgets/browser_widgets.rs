@@ -4,7 +4,7 @@ use url::Url;
 use super::{nav_bar, tab_bar, BrowserView};
 use crate::{
     engines::{BrowserEngine, PixelFormat},
-    to_url, ImageInfo,
+    to_url, ImageInfo, TabInfo,
 };
 
 #[cfg(feature = "ultralight")]
@@ -27,7 +27,7 @@ pub enum Message {
     DoWork,
 }
 
-pub struct BrowserWidget<Engine: BrowserEngine> {
+pub struct BrowserWidget<Engine: BrowserEngine<TabInfo>> {
     engine: Option<Engine>,
     home: Url,
     url: String,
@@ -38,7 +38,7 @@ pub struct BrowserWidget<Engine: BrowserEngine> {
     view_bounds: Size,
 }
 
-impl<Engine: BrowserEngine> Default for BrowserWidget<Engine> {
+impl<Engine: BrowserEngine<TabInfo>> Default for BrowserWidget<Engine> {
     fn default() -> Self {
         let home = Url::parse(Self::HOME).unwrap();
         Self {
@@ -64,7 +64,7 @@ impl BrowserWidget<Ultralight> {
     }
 }
 
-impl<Engine: BrowserEngine> BrowserWidget<Engine> {
+impl<Engine: BrowserEngine<TabInfo>> BrowserWidget<Engine> {
     const HOME: &'static str = "https://duckduckgo.com";
 
     pub fn new() -> Self {
@@ -185,7 +185,7 @@ impl<Engine: BrowserEngine> BrowserWidget<Engine> {
 
         if self.tab_bar {
             let tabs = self.engine().get_tabs();
-            let (active_tab, _) = self.engine().current_tab();
+            let active_tab = self.engine().get_tabs().get_current().id();
             column = column.push(tab_bar(tabs, active_tab))
         }
         if self.nav_bar {

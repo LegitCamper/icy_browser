@@ -7,12 +7,12 @@ use super::browser_widgets::Message;
 use crate::engines::Tab;
 
 // helper function to create navigation bar
-pub fn tab_bar(tabs: Vec<Tab>, active_tab: usize) -> Element<'static, Message> {
+pub fn tab_bar<TabInfo>(tabs: Vec<Tab<TabInfo>>, active_tab: usize) -> Element<'static, Message> {
     let tab_bar = tabs
         .iter()
         .fold(TB::new(Message::ChangeTab), |tab_bar, tab| {
             let idx = tab_bar.size();
-            tab_bar.push(idx, TabLabel::Text(tab.title.to_owned()))
+            tab_bar.push(idx, TabLabel::Text(tab.title()))
         })
         .set_active_tab(&active_tab)
         .on_close(Message::CloseTab)

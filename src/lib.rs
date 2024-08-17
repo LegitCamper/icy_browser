@@ -2,7 +2,7 @@ use iced::widget::image::{Handle, Image};
 use url::{ParseError, Url};
 
 mod engines;
-pub use engines::BrowserEngine;
+pub use engines::{BrowserEngine, Tab, TabInfo, Tabs};
 
 #[cfg(feature = "ultralight")]
 pub use engines::ultralight::Ultralight;
