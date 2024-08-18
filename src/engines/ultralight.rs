@@ -86,7 +86,9 @@ impl Ultralight {
     }
 }
 
-impl BrowserEngine<UltalightTabInfo> for Ultralight {
+impl BrowserEngine for Ultralight {
+    type TabInfo = UltalightTabInfo;
+
     fn new() -> Self {
         Ultralight::new()
     }
@@ -165,7 +167,7 @@ impl BrowserEngine<UltalightTabInfo> for Ultralight {
         &mut self.tabs
     }
 
-    fn new_tab(&mut self, url: &Url) {
+    fn new_tab(&mut self, url: &Url) -> u32 {
         if self
             .tabs
             .tabs
@@ -226,8 +228,13 @@ impl BrowserEngine<UltalightTabInfo> for Ultralight {
                 cursor,
             };
 
-            self.tabs.insert(Tab::new(site_url, title, tab_info));
+            let tab = Tab::new(site_url, title, tab_info);
+            let id = tab.id;
+
+            self.tabs.insert(tab);
+            return id;
         }
+        unreachable!();
     }
 
     fn goto_tab(&mut self, id: u32) {

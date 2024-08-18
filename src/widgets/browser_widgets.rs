@@ -4,7 +4,7 @@ use url::Url;
 use super::{nav_bar, tab_bar, BrowserView};
 use crate::{
     engines::{BrowserEngine, PixelFormat},
-    to_url, ImageInfo, TabInfo,
+    to_url, ImageInfo,
 };
 
 #[cfg(feature = "ultralight")]
@@ -17,8 +17,8 @@ pub enum Message {
     Refresh,
     GoHome,
     GoUrl(String),
-    ChangeTab(usize),
-    CloseTab(usize),
+    ChangeTab(u32),
+    CloseTab(u32),
     CreateTab,
     UrlChanged(String),
     SendKeyboardEvent(keyboard::Event),
@@ -27,7 +27,7 @@ pub enum Message {
     DoWork,
 }
 
-pub struct BrowserWidget<Engine: BrowserEngine<TabInfo>> {
+pub struct BrowserWidget<Engine: BrowserEngine> {
     engine: Option<Engine>,
     home: Url,
     url: String,
@@ -38,7 +38,10 @@ pub struct BrowserWidget<Engine: BrowserEngine<TabInfo>> {
     view_bounds: Size,
 }
 
-impl<Engine: BrowserEngine<TabInfo>> Default for BrowserWidget<Engine> {
+impl<Engine> Default for BrowserWidget<Engine>
+where
+    Engine: BrowserEngine,
+{
     fn default() -> Self {
         let home = Url::parse(Self::HOME).unwrap();
         Self {
@@ -64,7 +67,10 @@ impl BrowserWidget<Ultralight> {
     }
 }
 
-impl<Engine: BrowserEngine<TabInfo>> BrowserWidget<Engine> {
+impl<Engine> BrowserWidget<Engine>
+where
+    Engine: BrowserEngine,
+{
     const HOME: &'static str = "https://duckduckgo.com";
 
     pub fn new() -> Self {
@@ -136,14 +142,15 @@ impl<Engine: BrowserEngine<TabInfo>> BrowserWidget<Engine> {
             Message::SendMouseEvent(point, event) => {
                 self.engine_mut().handle_mouse_event(point, event);
             }
-            Message::ChangeTab(index) => self.engine_mut().goto_tab(index as u32).unwrap(),
-            Message::CloseTab(index) => {
-                self.engine_mut().close_tab(index as u32);
+            Message::ChangeTab(id) => self.engine_mut().goto_tab(id),
+            Message::CloseTab(id) => {
+                self.engine_mut().get_tabs_mut().remove(id);
             }
             Message::CreateTab => {
                 self.url = self.home.to_string();
                 let home = self.home.clone();
-                self.engine_mut().new_tab(&home);
+                let id = self.engine_mut().new_tab(&home);
+                self.engine_mut().get_tabs_mut().set_current_id(id);
             }
             Message::GoBackward => {
                 self.engine().go_back();

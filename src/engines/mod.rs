@@ -16,7 +16,9 @@ pub enum PixelFormat {
 }
 
 #[allow(unused)]
-pub trait BrowserEngine<TabInfo> {
+pub trait BrowserEngine {
+    type TabInfo: TabInfo;
+
     fn new() -> Self;
 
     fn do_work(&self);
@@ -32,10 +34,10 @@ pub trait BrowserEngine<TabInfo> {
     fn get_url(&self) -> Option<Url>;
     fn goto_url(&self, url: &Url);
     fn has_loaded(&self) -> bool;
-    fn new_tab(&mut self, url: &Url);
+    fn new_tab(&mut self, url: &Url) -> u32;
     fn goto_tab(&mut self, id: u32);
-    fn get_tabs(&self) -> &Tabs<TabInfo>;
-    fn get_tabs_mut(&mut self) -> &mut Tabs<TabInfo>;
+    fn get_tabs(&self) -> &Tabs<Self::TabInfo>;
+    fn get_tabs_mut(&mut self) -> &mut Tabs<Self::TabInfo>;
 
     fn refresh(&self);
     fn go_forward(&self);
@@ -96,6 +98,18 @@ impl<TabInfo> Tabs<TabInfo> {
             tabs: Vec::new(),
             current: 0,
         }
+    }
+
+    pub fn get_current_id(&self) -> u32 {
+        self.current
+    }
+
+    pub fn set_current_id(&mut self, id: u32) {
+        self.current = id
+    }
+
+    pub fn tabs(&self) -> &Vec<Tab<TabInfo>> {
+        &self.tabs
     }
 
     pub fn insert(&mut self, tab: Tab<TabInfo>) -> u32 {
