@@ -91,10 +91,11 @@ where
         viewport: &Rectangle,
     ) -> event::Status {
         // Send updates back if bounds change
-        if viewport.width != self.bounds.width || viewport.height != self.bounds.height {
+        let bounds = layout.bounds().size();
+        if bounds.width != self.bounds.width || bounds.height != self.bounds.height {
             self.bounds.width = viewport.width;
             self.bounds.height = viewport.height;
-            shell.publish((self.send_bounds)(self.bounds));
+            shell.publish((self.send_bounds)(bounds));
         }
 
         match event {
