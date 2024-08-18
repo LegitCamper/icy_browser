@@ -1,8 +1,7 @@
 // Simple browser with familiar browser widget and the ultralight(webkit) webengine as a backend
 
-use iced::{executor, Application, Command, Settings, Subscription, Theme};
+use iced::{Sandbox, Settings, Theme};
 use iced_aw::BOOTSTRAP_FONT_BYTES;
-use std::time::Duration;
 
 use icy_browser::{browser_widgets, BrowserWidget, Ultralight};
 
@@ -23,23 +22,19 @@ struct Browser {
 #[derive(Debug, Clone)]
 pub enum Message {
     BrowserWidget(browser_widgets::Message),
-    DoBrowserWork,
 }
 
-impl Application for Browser {
+impl Sandbox for Browser {
     type Message = Message;
-    type Executor = executor::Default;
-    type Flags = ();
-    type Theme = Theme;
 
-    fn new(_flags: Self::Flags) -> (Self, Command<Message>) {
+    fn new() -> Self {
         let widgets = BrowserWidget::new_with_ultralight()
             .with_tab_bar()
             .with_nav_bar()
             .with_browsesr_view()
             .build();
 
-        (Self { widgets }, Command::none())
+        Self { widgets }
     }
 
     fn title(&self) -> String {
@@ -50,18 +45,12 @@ impl Application for Browser {
         Theme::Dark
     }
 
-    fn subscription(&self) -> Subscription<Message> {
-        iced::time::every(Duration::from_millis(100)).map(move |_| Message::DoBrowserWork)
-    }
-
-    fn update(&mut self, message: Self::Message) -> Command<Message> {
+    fn update(&mut self, message: Self::Message) {
         match message {
             Message::BrowserWidget(msg) => {
                 self.widgets.update(msg);
             }
-            Message::DoBrowserWork => self.widgets.update(browser_widgets::Message::DoWork),
         }
-        Command::none()
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {

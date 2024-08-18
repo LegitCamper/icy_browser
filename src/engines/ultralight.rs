@@ -174,73 +174,63 @@ impl BrowserEngine for Ultralight {
     }
 
     fn new_tab(&mut self, url: &Url) -> u32 {
-        if self
-            .tabs
-            .tabs
-            .iter()
-            .filter(|tab| *tab.url.read().unwrap() == *url.as_ref())
-            .count()
-            == 0
-        {
-            let view = self
-                .renderer
-                .create_view(self.width, self.height, &self.view_config, None)
-                .unwrap();
+        let view = self
+            .renderer
+            .create_view(self.width, self.height, &self.view_config, None)
+            .unwrap();
 
-            let surface = view.surface().unwrap();
-            view.load_url(url.as_ref()).unwrap();
+        let surface = view.surface().unwrap();
+        view.load_url(url.as_ref()).unwrap();
 
-            // RGBA
-            debug_assert!(surface.row_bytes() / self.width == 4);
+        // RGBA
+        debug_assert!(surface.row_bytes() / self.width == 4);
 
-            // set callbacks
-            let site_url = Arc::new(RwLock::new(url.to_string()));
-            let cb_url = site_url.clone();
-            view.set_change_url_callback(move |_view, url| {
-                *cb_url.write().unwrap() = url;
-            });
+        // set callbacks
+        let site_url = Arc::new(RwLock::new(url.to_string()));
+        let cb_url = site_url.clone();
+        view.set_change_url_callback(move |_view, url| {
+            *cb_url.write().unwrap() = url;
+        });
 
-            let title = Arc::new(RwLock::new(view.title().unwrap()));
-            let cb_title = title.clone();
-            view.set_change_title_callback(move |_view, title| {
-                *cb_title.write().unwrap() = title;
-            });
+        let title = Arc::new(RwLock::new(view.title().unwrap()));
+        let cb_title = title.clone();
+        view.set_change_title_callback(move |_view, title| {
+            *cb_title.write().unwrap() = title;
+        });
 
-            let cursor = Arc::new(RwLock::new(mouse::Interaction::Idle));
-            let cb_cursor = cursor.clone();
-            view.set_change_cursor_callback(move |_view, cursor_update| {
-                *cb_cursor.write().unwrap() = match cursor_update {
-                    Cursor::None => mouse::Interaction::Idle,
-                    Cursor::Pointer => mouse::Interaction::Idle,
-                    Cursor::Hand => mouse::Interaction::Pointer,
-                    Cursor::Grab => mouse::Interaction::Grab,
-                    Cursor::VerticalText => mouse::Interaction::Text,
-                    Cursor::IBeam => mouse::Interaction::Text,
-                    Cursor::Cross => mouse::Interaction::Crosshair,
-                    Cursor::Wait => mouse::Interaction::Working,
-                    Cursor::Grabbing => mouse::Interaction::Grab,
-                    Cursor::NorthSouthResize => mouse::Interaction::ResizingVertically,
-                    Cursor::EastWestResize => mouse::Interaction::ResizingHorizontally,
-                    Cursor::NotAllowed => mouse::Interaction::NotAllowed,
-                    Cursor::ZoomIn => mouse::Interaction::ZoomIn,
-                    Cursor::ZoomOut => mouse::Interaction::ZoomIn,
-                    _ => mouse::Interaction::Pointer,
-                };
-            });
-
-            let tab_info = UltalightTabInfo {
-                surface,
-                view,
-                cursor,
+        let cursor = Arc::new(RwLock::new(mouse::Interaction::Idle));
+        let cb_cursor = cursor.clone();
+        view.set_change_cursor_callback(move |_view, cursor_update| {
+            *cb_cursor.write().unwrap() = match cursor_update {
+                Cursor::None => mouse::Interaction::Idle,
+                Cursor::Pointer => mouse::Interaction::Idle,
+                Cursor::Hand => mouse::Interaction::Pointer,
+                Cursor::Grab => mouse::Interaction::Grab,
+                Cursor::VerticalText => mouse::Interaction::Text,
+                Cursor::IBeam => mouse::Interaction::Text,
+                Cursor::Cross => mouse::Interaction::Crosshair,
+                Cursor::Wait => mouse::Interaction::Working,
+                Cursor::Grabbing => mouse::Interaction::Grab,
+                Cursor::NorthSouthResize => mouse::Interaction::ResizingVertically,
+                Cursor::EastWestResize => mouse::Interaction::ResizingHorizontally,
+                Cursor::NotAllowed => mouse::Interaction::NotAllowed,
+                Cursor::ZoomIn => mouse::Interaction::ZoomIn,
+                Cursor::ZoomOut => mouse::Interaction::ZoomIn,
+                _ => mouse::Interaction::Pointer,
             };
+        });
 
-            let tab = Tab::new(site_url, title, tab_info);
-            let id = tab.id;
+        let tab_info = UltalightTabInfo {
+            surface,
+            view,
+            cursor,
+        };
 
-            self.tabs.insert(tab);
-            return id;
-        }
-        unreachable!();
+        let tab = Tab::new(site_url, title, tab_info);
+        let id = tab.id;
+
+        self.tabs.insert(tab);
+        return id;
     }
 
     fn goto_tab(&mut self, id: u32) {

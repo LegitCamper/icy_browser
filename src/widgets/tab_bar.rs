@@ -3,20 +3,30 @@ use iced::{self, Element, Length};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 use iced_aw::{TabBar as TB, TabLabel};
 
-use super::browser_widgets::Message;
+use super::browser_widgets::{Message, TabSelectionType};
 use crate::engines::Tabs;
 
 // helper function to create navigation bar
-pub fn tab_bar<TabInfo>(tabs: &Tabs<TabInfo>, active_tab: u32) -> Element<'static, Message> {
+pub fn tab_bar<TabInfo>(tabs: &Tabs<TabInfo>) -> Element<'static, Message> {
+    let current_id = tabs.get_current_id();
+    let active_tab = tabs
+        .tabs()
+        .iter()
+        .position(|tab| tab.id() == current_id)
+        .expect("Failed to find tab with that id");
+
     let tab_bar = tabs
         .tabs()
         .iter()
-        .fold(TB::new(Message::ChangeTab), |tab_bar, tab| {
-            let id = tab_bar.size();
-            tab_bar.push(id as u32, TabLabel::Text(tab.title()))
-        })
+        .fold(
+            TB::new(|index| Message::ChangeTab(TabSelectionType::Index(index))),
+            |tab_bar, tab| {
+                let id = tab_bar.size();
+                tab_bar.push(id, TabLabel::Text(tab.title()))
+            },
+        )
         .set_active_tab(&active_tab)
-        .on_close(Message::CloseTab)
+        .on_close(|index| Message::CloseTab(TabSelectionType::Index(index)))
         .tab_width(Length::Shrink)
         .spacing(5.0)
         .padding(5.0);

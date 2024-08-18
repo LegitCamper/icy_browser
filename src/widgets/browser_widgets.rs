@@ -17,14 +17,21 @@ pub enum Message {
     Refresh,
     GoHome,
     GoUrl(String),
-    ChangeTab(u32),
-    CloseTab(u32),
+    ChangeTab(TabSelectionType),
+    CloseTab(TabSelectionType),
     CreateTab,
     UrlChanged(String),
     SendKeyboardEvent(keyboard::Event),
     SendMouseEvent(Point, mouse::Event),
     UpdateBounds(Size),
     DoWork,
+}
+
+#[derive(Debug, Clone)]
+/// Allows different widgets to interact in their native way
+pub enum TabSelectionType {
+    Id(u32),
+    Index(usize),
 }
 
 pub struct BrowserWidget<Engine: BrowserEngine> {
@@ -101,7 +108,7 @@ where
     }
 
     pub fn build(self) -> Self {
-        assert!(!self.engine.is_none());
+        assert!(self.engine.is_some());
 
         let mut build = Self {
             engine: self.engine,
@@ -130,6 +137,8 @@ where
     }
 
     pub fn update(&mut self, message: Message) {
+        self.engine().do_work();
+
         match message {
             Message::DoWork => self.engine().do_work(),
             Message::UpdateBounds(bounds) => {
@@ -142,10 +151,20 @@ where
             Message::SendMouseEvent(point, event) => {
                 self.engine_mut().handle_mouse_event(point, event);
             }
-            Message::ChangeTab(id) => self.engine_mut().goto_tab(id),
-            Message::CloseTab(id) => {
-                self.engine_mut().get_tabs_mut().remove(id);
-            }
+            Message::ChangeTab(index_type) => match index_type {
+                TabSelectionType::Id(id) => self.engine_mut().goto_tab(id),
+                TabSelectionType::Index(index) => {
+                    let id = self.engine_mut().get_tabs().index_to_id(index);
+                    self.engine_mut().goto_tab(id);
+                }
+            },
+            Message::CloseTab(select_type) => match select_type {
+                TabSelectionType::Id(id) => self.engine_mut().get_tabs_mut().remove(id),
+                TabSelectionType::Index(index) => {
+                    let id = self.engine_mut().get_tabs().index_to_id(index);
+                    self.engine_mut().get_tabs_mut().remove(id);
+                }
+            },
             Message::CreateTab => {
                 self.url = self.home.to_string();
                 let home = self.home.clone();
@@ -191,9 +210,7 @@ where
         let mut column = column![];
 
         if self.tab_bar {
-            let tabs = self.engine().get_tabs();
-            let active_tab = self.engine().get_tabs().get_current().id();
-            column = column.push(tab_bar(tabs, active_tab))
+            column = column.push(tab_bar(self.engine().get_tabs()))
         }
         if self.nav_bar {
             column = column.push(nav_bar(&self.url))

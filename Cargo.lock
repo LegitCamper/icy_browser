@@ -1569,7 +1569,6 @@ dependencies = [
 name = "icy_browser"
 version = "0.1.0"
 dependencies = [
- "cmake",
  "env_home",
  "iced",
  "iced_aw",

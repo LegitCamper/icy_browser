@@ -106,6 +106,22 @@ impl<TabInfo> Tabs<TabInfo> {
         }
     }
 
+    pub fn id_to_index(&self, id: u32) -> usize {
+        for (idx, tab) in self.tabs.iter().enumerate() {
+            if tab.id == id {
+                return idx;
+            }
+        }
+        panic!("Id: {} was not found", id);
+    }
+
+    pub fn index_to_id(&self, index: usize) -> u32 {
+        self.tabs
+            .get(index)
+            .unwrap_or_else(|| panic!("Index {} was not found", index))
+            .id
+    }
+
     pub fn get_current_id(&self) -> u32 {
         self.current
     }
@@ -125,7 +141,17 @@ impl<TabInfo> Tabs<TabInfo> {
     }
 
     pub fn remove(&mut self, id: u32) {
-        self.tabs.retain(|tab| tab.id != id)
+        // TODO: have list of prevous tabs instead
+        if self.current == id {
+            for tab in self.tabs.iter().rev() {
+                if tab.id != id {
+                    self.current = tab.id;
+                    break;
+                }
+            }
+        }
+
+        self.tabs.retain(|tab| tab.id != id);
     }
 
     pub fn get_current(&self) -> &Tab<TabInfo> {
