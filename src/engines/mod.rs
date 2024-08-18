@@ -35,7 +35,6 @@ pub trait BrowserEngine {
     fn goto_url(&self, url: &Url);
     fn has_loaded(&self) -> bool;
     fn new_tab(&mut self, url: &Url) -> u32;
-    fn goto_tab(&mut self, id: u32);
     fn get_tabs(&self) -> &Tabs<Self::TabInfo>;
     fn get_tabs_mut(&mut self) -> &mut Tabs<Self::TabInfo>;
 
@@ -140,7 +139,8 @@ impl<TabInfo> Tabs<TabInfo> {
         id
     }
 
-    pub fn remove(&mut self, id: u32) {
+    /// Returns the newly active tab
+    pub fn remove(&mut self, id: u32) -> u32 {
         // TODO: have list of prevous tabs instead
         if self.current == id {
             for tab in self.tabs.iter().rev() {
@@ -152,6 +152,7 @@ impl<TabInfo> Tabs<TabInfo> {
         }
 
         self.tabs.retain(|tab| tab.id != id);
+        self.current
     }
 
     pub fn get_current(&self) -> &Tab<TabInfo> {

@@ -151,20 +151,26 @@ where
             Message::SendMouseEvent(point, event) => {
                 self.engine_mut().handle_mouse_event(point, event);
             }
-            Message::ChangeTab(index_type) => match index_type {
-                TabSelectionType::Id(id) => self.engine_mut().goto_tab(id),
-                TabSelectionType::Index(index) => {
-                    let id = self.engine_mut().get_tabs().index_to_id(index);
-                    self.engine_mut().goto_tab(id);
-                }
-            },
-            Message::CloseTab(select_type) => match select_type {
-                TabSelectionType::Id(id) => self.engine_mut().get_tabs_mut().remove(id),
-                TabSelectionType::Index(index) => {
-                    let id = self.engine_mut().get_tabs().index_to_id(index);
-                    self.engine_mut().get_tabs_mut().remove(id);
-                }
-            },
+            Message::ChangeTab(index_type) => {
+                let id = match index_type {
+                    TabSelectionType::Id(id) => id,
+                    TabSelectionType::Index(index) => {
+                        self.engine_mut().get_tabs().index_to_id(index)
+                    }
+                };
+                self.engine_mut().get_tabs_mut().set_current_id(id);
+                self.url = self.engine().get_tabs().get_current().url();
+            }
+            Message::CloseTab(index_type) => {
+                let id = match index_type {
+                    TabSelectionType::Id(id) => id,
+                    TabSelectionType::Index(index) => {
+                        self.engine_mut().get_tabs().index_to_id(index)
+                    }
+                };
+                self.engine_mut().get_tabs_mut().remove(id);
+                self.url = self.engine().get_tabs().get_current().url();
+            }
             Message::CreateTab => {
                 self.url = self.home.to_string();
                 let home = self.home.clone();

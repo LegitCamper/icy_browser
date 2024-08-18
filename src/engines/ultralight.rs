@@ -230,11 +230,7 @@ impl BrowserEngine for Ultralight {
         let id = tab.id;
 
         self.tabs.insert(tab);
-        return id;
-    }
-
-    fn goto_tab(&mut self, id: u32) {
-        self.tabs.current = id
+        id
     }
 
     fn refresh(&self) {
