@@ -18,7 +18,7 @@ use url::Url;
 #[cfg(not(debug_assertions))]
 use env_home::env_home_dir;
 
-use super::{BrowserEngine, PixelFormat};
+use super::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 
 struct UlLogger;
 impl Logger for UlLogger {
@@ -27,30 +27,20 @@ impl Logger for UlLogger {
     }
 }
 
-pub struct Tab {
+pub struct UltalightTabInfo {
     surface: Surface,
     view: View,
-    title: Arc<RwLock<String>>,
-    url: Arc<RwLock<String>>,
     cursor: Arc<RwLock<mouse::Interaction>>,
 }
 
-impl From<&Tab> for super::Tab {
-    fn from(value: &Tab) -> Self {
-        Self {
-            url: Url::parse(value.url.read().unwrap().as_str()).unwrap(),
-            title: value.title.read().unwrap().to_string(),
-        }
-    }
-}
+impl TabInfo for UltalightTabInfo {}
 
 pub struct Ultralight {
     renderer: Renderer,
     view_config: ViewConfig,
     width: u32,
     height: u32,
-    current_tab: Option<u32>,
-    tabs: Vec<Tab>,
+    tabs: Tabs<UltalightTabInfo>,
 }
 
 impl Ultralight {
@@ -91,29 +81,14 @@ impl Ultralight {
             view_config,
             width: 800,
             height: 800,
-            current_tab: None,
-            tabs: Vec::new(),
-        }
-    }
-
-    fn get_tab(&self) -> Option<&Tab> {
-        if let Some(index) = self.current_tab.as_ref() {
-            self.tabs.get(*index as usize)
-        } else {
-            None
-        }
-    }
-
-    fn get_tab_mut(&mut self) -> Option<&mut Tab> {
-        if let Some(index) = self.current_tab.as_ref() {
-            self.tabs.get_mut(*index as usize)
-        } else {
-            None
+            tabs: Tabs::new(),
         }
     }
 }
 
 impl BrowserEngine for Ultralight {
+    type TabInfo = UltalightTabInfo;
+
     fn new() -> Self {
         Ultralight::new()
     }
@@ -123,7 +98,7 @@ impl BrowserEngine for Ultralight {
     }
 
     fn need_render(&self) -> bool {
-        self.get_tab().unwrap().view.needs_paint()
+        self.get_tabs().get_current().tab_info.view.needs_paint()
     }
 
     fn render(&mut self) {
@@ -137,9 +112,9 @@ impl BrowserEngine for Ultralight {
     fn resize(&mut self, size: Size) {
         let (width, height) = (size.width as u32, size.height as u32);
         (self.width, self.height) = (width, height);
-        self.tabs.iter().for_each(|tab| {
-            tab.view.resize(width, height);
-            tab.surface.resize(width, height);
+        self.tabs.tabs.iter().for_each(|tab| {
+            tab.tab_info.view.resize(width, height);
+            tab.tab_info.surface.resize(width, height);
         })
     }
 
@@ -148,7 +123,7 @@ impl BrowserEngine for Ultralight {
 
         let size = self.size();
         let mut vec = Vec::new();
-        match self.get_tab_mut().unwrap().surface.lock_pixels() {
+        match self.tabs.get_current_mut().tab_info.surface.lock_pixels() {
             Some(pixel_data) => vec.extend_from_slice(&pixel_data),
             None => {
                 let image = vec![255; size.0 as usize * size.1 as usize];
@@ -160,37 +135,41 @@ impl BrowserEngine for Ultralight {
     }
 
     fn get_cursor(&self) -> mouse::Interaction {
-        *self.get_tab().unwrap().cursor.read().unwrap()
+        *self.tabs.get_current().tab_info.cursor.read().unwrap()
     }
 
     fn get_title(&self) -> Option<String> {
-        self.get_tab()?.view.title().ok()
+        self.tabs.get_current().tab_info.view.title().ok()
     }
 
     fn get_url(&self) -> Option<Url> {
-        Some(Url::parse(self.get_tab()?.url.read().ok()?.clone().as_str()).ok()?)
+        Some(Url::parse(self.tabs.get_current().tab_info.view.url().ok()?.as_str()).ok()?)
     }
 
     fn goto_url(&self, url: &Url) {
-        self.get_tab().unwrap().view.load_url(url.as_ref()).unwrap();
+        self.tabs
+            .get_current()
+            .tab_info
+            .view
+            .load_url(url.as_ref())
+            .unwrap();
     }
 
     fn has_loaded(&self) -> bool {
-        !self.get_tab().unwrap().view.is_loading()
+        !self.tabs.get_current().tab_info.view.is_loading()
     }
 
-    fn get_tabs(&self) -> Vec<super::Tab> {
-        self.tabs.iter().map(Into::<super::Tab>::into).collect()
+    fn get_tabs(&self) -> &Tabs<UltalightTabInfo> {
+        &self.tabs
     }
 
-    fn current_tab(&self) -> (usize, super::Tab) {
-        let idx = self.current_tab.unwrap() as usize;
-        let tab = self.tabs.get(idx).unwrap();
-        (idx, tab.into())
+    fn get_tabs_mut(&mut self) -> &mut Tabs<UltalightTabInfo> {
+        &mut self.tabs
     }
 
-    fn new_tab(&mut self, url: &Url) {
+    fn new_tab(&mut self, url: &Url) -> u32 {
         if self
+            .tabs
             .tabs
             .iter()
             .filter(|tab| *tab.url.read().unwrap() == *url.as_ref())
@@ -243,47 +222,43 @@ impl BrowserEngine for Ultralight {
                 };
             });
 
-            let tab = Tab {
-                title,
-                view,
+            let tab_info = UltalightTabInfo {
                 surface,
-                url: site_url,
+                view,
                 cursor,
             };
 
-            self.tabs.push(tab);
-            self.current_tab = Some(self.tabs.len() as u32 - 1);
+            let tab = Tab::new(site_url, title, tab_info);
+            let id = tab.id;
+
+            self.tabs.insert(tab);
+            return id;
         }
+        unreachable!();
     }
 
-    fn goto_tab(&mut self, idx: u32) -> Option<()> {
-        assert!(self.tabs.len() as u32 >= idx);
-        self.current_tab = Some(idx);
-        Some(())
-    }
-
-    fn close_tab(&mut self, idx: u32) {
-        self.tabs.remove(idx as usize);
+    fn goto_tab(&mut self, id: u32) {
+        self.tabs.current = id
     }
 
     fn refresh(&self) {
-        self.get_tab().unwrap().view.reload();
+        self.tabs.get_current().tab_info.view.reload();
     }
 
     fn go_forward(&self) {
-        self.get_tab().unwrap().view.go_forward();
+        self.tabs.get_current().tab_info.view.go_forward();
     }
 
     fn go_back(&self) {
-        self.get_tab().unwrap().view.go_back();
+        self.tabs.get_current().tab_info.view.go_back();
     }
 
     fn focus(&self) {
-        self.get_tab().unwrap().view.focus();
+        self.tabs.get_current().tab_info.view.focus();
     }
 
     fn unfocus(&self) {
-        self.get_tab().unwrap().view.unfocus();
+        self.tabs.get_current().tab_info.view.unfocus();
     }
 
     fn scroll(&self, delta: ScrollDelta) {
@@ -301,7 +276,11 @@ impl BrowserEngine for Ultralight {
             )
             .unwrap(),
         };
-        self.get_tab().unwrap().view.fire_scroll_event(scroll_event);
+        self.tabs
+            .get_current()
+            .tab_info
+            .view
+            .fire_scroll_event(scroll_event);
     }
 
     fn handle_keyboard_event(&self, event: keyboard::Event) {
@@ -335,7 +314,11 @@ impl BrowserEngine for Ultralight {
         };
 
         if let Some(key_event) = key_event {
-            self.get_tab().unwrap().view.fire_key_event(key_event);
+            self.tabs
+                .get_current()
+                .tab_info
+                .view
+                .fire_key_event(key_event);
         }
     }
 
@@ -350,7 +333,7 @@ impl BrowserEngine for Ultralight {
             mouse::Event::ButtonPressed(mouse::Button::Back) => (),
             mouse::Event::ButtonReleased(mouse::Button::Back) => (),
             mouse::Event::ButtonPressed(mouse::Button::Left) => {
-                self.get_tab().unwrap().view.fire_mouse_event(
+                self.tabs.get_current().tab_info.view.fire_mouse_event(
                     MouseEvent::new(
                         ul_next::event::MouseEventType::MouseDown,
                         point.x as i32,
@@ -361,7 +344,7 @@ impl BrowserEngine for Ultralight {
                 );
             }
             mouse::Event::ButtonReleased(mouse::Button::Left) => {
-                self.get_tab().unwrap().view.fire_mouse_event(
+                self.tabs.get_current().tab_info.view.fire_mouse_event(
                     MouseEvent::new(
                         ul_next::event::MouseEventType::MouseUp,
                         point.x as i32,
@@ -372,7 +355,7 @@ impl BrowserEngine for Ultralight {
                 );
             }
             mouse::Event::ButtonPressed(mouse::Button::Right) => {
-                self.get_tab().unwrap().view.fire_mouse_event(
+                self.tabs.get_current().tab_info.view.fire_mouse_event(
                     MouseEvent::new(
                         ul_next::event::MouseEventType::MouseDown,
                         point.x as i32,
@@ -383,7 +366,7 @@ impl BrowserEngine for Ultralight {
                 );
             }
             mouse::Event::ButtonReleased(mouse::Button::Right) => {
-                self.get_tab().unwrap().view.fire_mouse_event(
+                self.tabs.get_current().tab_info.view.fire_mouse_event(
                     MouseEvent::new(
                         ul_next::event::MouseEventType::MouseUp,
                         point.x as i32,
@@ -394,7 +377,7 @@ impl BrowserEngine for Ultralight {
                 );
             }
             mouse::Event::CursorMoved { position: _ } => {
-                self.get_tab().unwrap().view.fire_mouse_event(
+                self.tabs.get_current().tab_info.view.fire_mouse_event(
                     MouseEvent::new(
                         ul_next::event::MouseEventType::MouseMoved,
                         point.x as i32,

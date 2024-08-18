@@ -17,8 +17,8 @@ pub enum Message {
     Refresh,
     GoHome,
     GoUrl(String),
-    ChangeTab(usize),
-    CloseTab(usize),
+    ChangeTab(u32),
+    CloseTab(u32),
     CreateTab,
     UrlChanged(String),
     SendKeyboardEvent(keyboard::Event),
@@ -38,7 +38,10 @@ pub struct BrowserWidget<Engine: BrowserEngine> {
     view_bounds: Size,
 }
 
-impl<Engine: BrowserEngine> Default for BrowserWidget<Engine> {
+impl<Engine> Default for BrowserWidget<Engine>
+where
+    Engine: BrowserEngine,
+{
     fn default() -> Self {
         let home = Url::parse(Self::HOME).unwrap();
         Self {
@@ -64,7 +67,10 @@ impl BrowserWidget<Ultralight> {
     }
 }
 
-impl<Engine: BrowserEngine> BrowserWidget<Engine> {
+impl<Engine> BrowserWidget<Engine>
+where
+    Engine: BrowserEngine,
+{
     const HOME: &'static str = "https://duckduckgo.com";
 
     pub fn new() -> Self {
@@ -136,14 +142,15 @@ impl<Engine: BrowserEngine> BrowserWidget<Engine> {
             Message::SendMouseEvent(point, event) => {
                 self.engine_mut().handle_mouse_event(point, event);
             }
-            Message::ChangeTab(index) => self.engine_mut().goto_tab(index as u32).unwrap(),
-            Message::CloseTab(index) => {
-                self.engine_mut().close_tab(index as u32);
+            Message::ChangeTab(id) => self.engine_mut().goto_tab(id),
+            Message::CloseTab(id) => {
+                self.engine_mut().get_tabs_mut().remove(id);
             }
             Message::CreateTab => {
                 self.url = self.home.to_string();
                 let home = self.home.clone();
-                self.engine_mut().new_tab(&home);
+                let id = self.engine_mut().new_tab(&home);
+                self.engine_mut().get_tabs_mut().set_current_id(id);
             }
             Message::GoBackward => {
                 self.engine().go_back();
@@ -185,7 +192,7 @@ impl<Engine: BrowserEngine> BrowserWidget<Engine> {
 
         if self.tab_bar {
             let tabs = self.engine().get_tabs();
-            let (active_tab, _) = self.engine().current_tab();
+            let active_tab = self.engine().get_tabs().get_current().id();
             column = column.push(tab_bar(tabs, active_tab))
         }
         if self.nav_bar {
