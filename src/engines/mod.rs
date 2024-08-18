@@ -11,8 +11,8 @@ use url::Url;
 pub mod ultralight;
 
 pub enum PixelFormat {
-    RGBA,
-    BGRA,
+    Rgba,
+    Bgra,
 }
 
 #[allow(unused)]
@@ -90,6 +90,12 @@ impl<TabInfo> Tab<TabInfo> {
 pub struct Tabs<TabInfo> {
     tabs: Vec<Tab<TabInfo>>,
     current: u32,
+}
+
+impl<TabInfo> Default for Tabs<TabInfo> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<TabInfo> Tabs<TabInfo> {

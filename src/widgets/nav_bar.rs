@@ -31,7 +31,7 @@ pub fn nav_bar(url: &str) -> Element<Message> {
     );
     let space_left = Space::new(Length::Fill, Length::Shrink);
     let space_right = Space::new(Length::Fill, Length::Shrink);
-    let search = text_input("https://site.com", url.as_ref())
+    let search = text_input("https://site.com", url)
         .on_input(Message::UrlChanged)
         .on_paste(Message::GoUrl)
         .on_submit(Message::GoUrl(url.to_string()))

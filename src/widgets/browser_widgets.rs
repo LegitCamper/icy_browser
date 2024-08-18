@@ -101,7 +101,7 @@ where
     }
 
     pub fn build(self) -> Self {
-        assert_eq!(self.engine.is_none(), false);
+        assert!(!self.engine.is_none());
 
         let mut build = Self {
             engine: self.engine,
@@ -173,12 +173,12 @@ where
         if self.engine().need_render() {
             let (format, image_data) = self.engine_mut().pixel_buffer();
             self.image = match format {
-                PixelFormat::RGBA => ImageInfo::new(
+                PixelFormat::Rgba => ImageInfo::new(
                     image_data,
                     self.view_bounds.width as u32,
                     self.view_bounds.height as u32,
                 ),
-                PixelFormat::BGRA => ImageInfo::new_from_bgr(
+                PixelFormat::Bgra => ImageInfo::new_from_bgr(
                     image_data,
                     self.view_bounds.width as u32,
                     self.view_bounds.height as u32,

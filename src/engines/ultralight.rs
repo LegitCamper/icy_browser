@@ -43,6 +43,12 @@ pub struct Ultralight {
     tabs: Tabs<UltalightTabInfo>,
 }
 
+impl Default for Ultralight {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Ultralight {
     pub fn new() -> Self {
         let config = Config::start().build().unwrap();
@@ -131,7 +137,7 @@ impl BrowserEngine for Ultralight {
             }
         };
 
-        (PixelFormat::BGRA, vec)
+        (PixelFormat::Bgra, vec)
     }
 
     fn get_cursor(&self) -> mouse::Interaction {
@@ -143,7 +149,7 @@ impl BrowserEngine for Ultralight {
     }
 
     fn get_url(&self) -> Option<Url> {
-        Some(Url::parse(self.tabs.get_current().tab_info.view.url().ok()?.as_str()).ok()?)
+        Url::parse(self.tabs.get_current().tab_info.view.url().ok()?.as_str()).ok()
     }
 
     fn goto_url(&self, url: &Url) {
