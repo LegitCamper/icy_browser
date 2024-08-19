@@ -54,6 +54,6 @@ impl Sandbox for Browser {
     }
 
     fn view(&self) -> iced::Element<'_, Self::Message> {
-        self.widgets.view().map(Message::BrowserWidget).into()
+        self.widgets.view().map(Message::BrowserWidget)
     }
 }

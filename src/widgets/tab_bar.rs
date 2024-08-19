@@ -4,10 +4,10 @@ use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 use iced_aw::{TabBar as TB, TabLabel};
 
 use super::browser_widgets::{Message, TabSelectionType};
-use crate::engines::Tabs;
+use crate::engines::{TabInfo, Tabs};
 
 // helper function to create navigation bar
-pub fn tab_bar<TabInfo>(tabs: &Tabs<TabInfo>) -> Element<'static, Message> {
+pub fn tab_bar<Info: TabInfo>(tabs: &Tabs<Info>) -> Element<'static, Message> {
     let current_id = tabs.get_current_id();
     let active_tab = tabs
         .tabs()

@@ -12,6 +12,16 @@ use iced::{theme::Theme, Element, Event, Length, Point, Rectangle, Size};
 
 use crate::ImageInfo;
 
+pub fn browser_view<Message>(
+    bounds: Size,
+    image: &ImageInfo,
+    send_bounds: Box<dyn Fn(Size) -> Message>,
+    keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
+    mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
+) -> BrowserView<Message> {
+    BrowserView::new(bounds, image, send_bounds, keyboard_event, mouse_event)
+}
+
 pub struct BrowserView<Message> {
     bounds: Size,
     image: Image<Handle>,
@@ -22,13 +32,14 @@ pub struct BrowserView<Message> {
 
 impl<Message> BrowserView<Message> {
     pub fn new(
+        bounds: Size,
         image: &ImageInfo,
         send_bounds: Box<dyn Fn(Size) -> Message>,
         keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
         mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
     ) -> Self {
         Self {
-            bounds: Size::new(800., 800.),
+            bounds,
             image: image.as_image(),
             send_bounds,
             keyboard_event,
@@ -88,13 +99,11 @@ where
         _renderer: &Renderer,
         _clipboard: &mut dyn Clipboard,
         shell: &mut Shell<'_, Message>,
-        viewport: &Rectangle,
+        _viewport: &Rectangle,
     ) -> event::Status {
         // Send updates back if bounds change
         let bounds = layout.bounds().size();
-        if bounds.width != self.bounds.width || bounds.height != self.bounds.height {
-            self.bounds.width = viewport.width;
-            self.bounds.height = viewport.height;
+        if self.bounds != bounds {
             shell.publish((self.send_bounds)(bounds));
         }
 

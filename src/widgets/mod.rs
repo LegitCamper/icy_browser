@@ -1,5 +1,5 @@
 mod browser_view;
-pub use browser_view::BrowserView;
+pub use browser_view::browser_view;
 
 mod nav_bar;
 pub use nav_bar::nav_bar;

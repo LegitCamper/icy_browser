@@ -7,6 +7,8 @@ use iced::Point;
 use rand::Rng;
 use url::Url;
 
+use crate::ImageInfo;
+
 #[cfg(feature = "webkit")]
 pub mod ultralight;
 
@@ -17,12 +19,13 @@ pub enum PixelFormat {
 
 #[allow(unused)]
 pub trait BrowserEngine {
-    type TabInfo: TabInfo;
+    type Info: TabInfo;
 
     fn new() -> Self;
 
     fn do_work(&self);
     fn need_render(&self) -> bool;
+    fn force_need_render(&self);
     fn render(&mut self);
     fn size(&self) -> (u32, u32);
     fn resize(&mut self, size: Size);
@@ -30,13 +33,11 @@ pub trait BrowserEngine {
 
     fn get_cursor(&self) -> Interaction;
     // fn get_icon(&self) -> Image<Handle>;
-    fn get_title(&self) -> Option<String>;
-    fn get_url(&self) -> Option<Url>;
     fn goto_url(&self, url: &Url);
     fn has_loaded(&self) -> bool;
-    fn new_tab(&mut self, url: &Url) -> u32;
-    fn get_tabs(&self) -> &Tabs<Self::TabInfo>;
-    fn get_tabs_mut(&mut self) -> &mut Tabs<Self::TabInfo>;
+    fn new_tab(&mut self, url: Url, size: Size) -> Tab<Self::Info>;
+    fn get_tabs(&self) -> &Tabs<Self::Info>;
+    fn get_tabs_mut(&mut self) -> &mut Tabs<Self::Info>;
 
     fn refresh(&self);
     fn go_forward(&self);
@@ -50,27 +51,40 @@ pub trait BrowserEngine {
 }
 
 /// Engine specific tab information
-pub trait TabInfo {}
+pub trait TabInfo {
+    fn url(&self) -> String;
+    fn title(&self) -> String;
+}
 
 /// Stores Tab info like url & title
 // Some browser engines take a closure to the url and title
 // to automatically update it when it changes
-pub struct Tab<TabInfo> {
+pub struct Tab<Info: TabInfo> {
     id: u32,
-    url: Arc<RwLock<String>>,
-    title: Arc<RwLock<String>>,
-    tab_info: TabInfo,
+    _url: Arc<RwLock<String>>,
+    _title: Arc<RwLock<String>>,
+    view: ImageInfo,
+    info: Info,
 }
 
-impl<TabInfo> Tab<TabInfo> {
-    pub fn new(url: Arc<RwLock<String>>, title: Arc<RwLock<String>>, tab_info: TabInfo) -> Self {
+impl<Info: TabInfo> Tab<Info> {
+    pub fn new(_url: Arc<RwLock<String>>, _title: Arc<RwLock<String>>, info: Info) -> Self {
         let id = rand::thread_rng().gen();
         Self {
             id,
-            url,
-            title,
-            tab_info,
+            _url,
+            _title,
+            view: ImageInfo::default(),
+            info,
         }
+    }
+
+    pub fn get_view(&self) -> &ImageInfo {
+        &self.view
+    }
+
+    pub fn set_view(&mut self, view: ImageInfo) {
+        self.view = view;
     }
 
     pub fn id(&self) -> u32 {
@@ -78,26 +92,26 @@ impl<TabInfo> Tab<TabInfo> {
     }
 
     pub fn url(&self) -> String {
-        self.url.read().unwrap().to_string()
+        self.info.url()
     }
 
     pub fn title(&self) -> String {
-        self.title.read().unwrap().to_string()
+        self.info.title()
     }
 }
 
-pub struct Tabs<TabInfo> {
-    tabs: Vec<Tab<TabInfo>>,
+pub struct Tabs<Info: TabInfo> {
+    tabs: Vec<Tab<Info>>,
     current: u32,
 }
 
-impl<TabInfo> Default for Tabs<TabInfo> {
+impl<Info: TabInfo> Default for Tabs<Info> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<TabInfo> Tabs<TabInfo> {
+impl<Info: TabInfo> Tabs<Info> {
     pub fn new() -> Self {
         Self {
             tabs: Vec::new(),
@@ -129,11 +143,11 @@ impl<TabInfo> Tabs<TabInfo> {
         self.current = id
     }
 
-    pub fn tabs(&self) -> &Vec<Tab<TabInfo>> {
+    pub fn tabs(&self) -> &Vec<Tab<Info>> {
         &self.tabs
     }
 
-    pub fn insert(&mut self, tab: Tab<TabInfo>) -> u32 {
+    pub fn insert(&mut self, tab: Tab<Info>) -> u32 {
         let id = tab.id;
         self.tabs.push(tab);
         id
@@ -155,15 +169,15 @@ impl<TabInfo> Tabs<TabInfo> {
         self.current
     }
 
-    pub fn get_current(&self) -> &Tab<TabInfo> {
+    pub fn get_current(&self) -> &Tab<Info> {
         self.get(self.current)
     }
 
-    pub fn get_current_mut(&mut self) -> &mut Tab<TabInfo> {
+    pub fn get_current_mut(&mut self) -> &mut Tab<Info> {
         self.get_mut(self.current)
     }
 
-    pub fn get(&self, id: u32) -> &Tab<TabInfo> {
+    pub fn get(&self, id: u32) -> &Tab<Info> {
         for tab in self.tabs.iter() {
             if tab.id == id {
                 return tab;
@@ -172,7 +186,7 @@ impl<TabInfo> Tabs<TabInfo> {
         panic!("Unable to find Tab with id: {}", id);
     }
 
-    pub fn get_mut(&mut self, id: u32) -> &mut Tab<TabInfo> {
+    pub fn get_mut(&mut self, id: u32) -> &mut Tab<Info> {
         for tab in self.tabs.iter_mut() {
             if tab.id == id {
                 return tab;

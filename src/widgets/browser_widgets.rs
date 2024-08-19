@@ -1,11 +1,9 @@
 use iced::{keyboard, mouse, widget::column, Element, Point, Size};
+use iced_on_focus_widget::hoverable;
 use url::Url;
 
-use super::{nav_bar, tab_bar, BrowserView};
-use crate::{
-    engines::{BrowserEngine, PixelFormat},
-    to_url, ImageInfo,
-};
+use super::{browser_view, nav_bar, tab_bar};
+use crate::{engines::BrowserEngine, to_url, ImageInfo};
 
 #[cfg(feature = "ultralight")]
 use crate::engines::ultralight::Ultralight;
@@ -21,14 +19,14 @@ pub enum Message {
     CloseTab(TabSelectionType),
     CreateTab,
     UrlChanged(String),
+    UpdateUrl,
     SendKeyboardEvent(keyboard::Event),
     SendMouseEvent(Point, mouse::Event),
     UpdateBounds(Size),
-    DoWork,
 }
 
-#[derive(Debug, Clone)]
 /// Allows different widgets to interact in their native way
+#[derive(Debug, Clone)]
 pub enum TabSelectionType {
     Id(u32),
     Index(usize),
@@ -41,7 +39,6 @@ pub struct BrowserWidget<Engine: BrowserEngine> {
     tab_bar: bool,
     nav_bar: bool,
     browser_view: bool,
-    image: ImageInfo,
     view_bounds: Size,
 }
 
@@ -58,7 +55,6 @@ where
             tab_bar: false,
             nav_bar: false,
             browser_view: false,
-            image: ImageInfo::default(),
             view_bounds: Size::new(800., 800.),
         }
     }
@@ -88,7 +84,7 @@ where
     }
 
     pub fn with_homepage(mut self, homepage: &str) -> Self {
-        self.home = Url::parse(homepage).unwrap();
+        self.home = Url::parse(homepage).expect("Failed to parse homepage as a url!");
         self
     }
 
@@ -117,7 +113,6 @@ where
             nav_bar: self.nav_bar,
             url: self.url,
             browser_view: self.browser_view,
-            image: self.image,
             view_bounds: self.view_bounds,
         };
         build.update(Message::CreateTab);
@@ -140,7 +135,6 @@ where
         self.engine().do_work();
 
         match message {
-            Message::DoWork => self.engine().do_work(),
             Message::UpdateBounds(bounds) => {
                 self.view_bounds = bounds;
                 self.engine_mut().resize(bounds);
@@ -162,6 +156,11 @@ where
                 self.url = self.engine().get_tabs().get_current().url();
             }
             Message::CloseTab(index_type) => {
+                // ensure there is still a tab
+                if self.engine().get_tabs().tabs().len() == 1 {
+                    self.update(Message::CreateTab)
+                }
+
                 let id = match index_type {
                     TabSelectionType::Id(id) => id,
                     TabSelectionType::Index(index) => {
@@ -174,16 +173,20 @@ where
             Message::CreateTab => {
                 self.url = self.home.to_string();
                 let home = self.home.clone();
-                let id = self.engine_mut().new_tab(&home);
+                let bounds = self.view_bounds;
+                let tab = self.engine_mut().new_tab(home, bounds);
+                let id = self.engine_mut().get_tabs_mut().insert(tab);
                 self.engine_mut().get_tabs_mut().set_current_id(id);
+                self.engine_mut().force_need_render();
+                self.engine_mut().resize(bounds);
             }
             Message::GoBackward => {
                 self.engine().go_back();
-                self.url = self.engine().get_url().unwrap().to_string();
+                self.url = self.engine().get_tabs().get_current().url();
             }
             Message::GoForward => {
                 self.engine().go_forward();
-                self.url = self.engine().get_url().unwrap().to_string();
+                self.url = self.engine().get_tabs().get_current().url();
             }
             Message::Refresh => self.engine().refresh(),
             Message::GoHome => {
@@ -192,23 +195,24 @@ where
             Message::GoUrl(url) => {
                 self.engine().goto_url(&to_url(&url).unwrap());
             }
+            Message::UpdateUrl => {
+                self.url = self.engine().get_tabs().get_current().url();
+            }
             Message::UrlChanged(url) => self.url = url,
         }
 
         if self.engine().need_render() {
             let (format, image_data) = self.engine_mut().pixel_buffer();
-            self.image = match format {
-                PixelFormat::Rgba => ImageInfo::new(
-                    image_data,
-                    self.view_bounds.width as u32,
-                    self.view_bounds.height as u32,
-                ),
-                PixelFormat::Bgra => ImageInfo::new_from_bgr(
-                    image_data,
-                    self.view_bounds.width as u32,
-                    self.view_bounds.height as u32,
-                ),
-            }
+            let view = ImageInfo::new(
+                image_data,
+                format,
+                self.view_bounds.width as u32,
+                self.view_bounds.height as u32,
+            );
+            self.engine_mut()
+                .get_tabs_mut()
+                .get_current_mut()
+                .set_view(view)
         }
     }
 
@@ -219,11 +223,12 @@ where
             column = column.push(tab_bar(self.engine().get_tabs()))
         }
         if self.nav_bar {
-            column = column.push(nav_bar(&self.url))
+            column = column.push(hoverable(nav_bar(&self.url)).on_unfocus(Message::UpdateUrl))
         }
         if self.browser_view {
-            column = column.push(BrowserView::new(
-                &self.image,
+            column = column.push(browser_view(
+                self.view_bounds,
+                self.engine().get_tabs().get_current().get_view(),
                 Box::new(Message::UpdateBounds),
                 Box::new(Message::SendKeyboardEvent),
                 Box::new(Message::SendMouseEvent),

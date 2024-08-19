@@ -2,13 +2,13 @@ use iced::widget::image::{Handle, Image};
 use url::{ParseError, Url};
 
 mod engines;
-pub use engines::{BrowserEngine, Tab, TabInfo, Tabs};
+pub use engines::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 
 #[cfg(feature = "ultralight")]
 pub use engines::ultralight::Ultralight;
 
 mod widgets;
-pub use widgets::{browser_widgets, nav_bar, tab_bar, BrowserView, BrowserWidget};
+pub use widgets::{browser_widgets, nav_bar, tab_bar, BrowserWidget};
 
 // Image details for passing the view around
 #[derive(Debug, Clone)]
@@ -33,8 +33,18 @@ impl ImageInfo {
     const WIDTH: u32 = 800;
     const HEIGHT: u32 = 800;
 
-    fn new(pixels: Vec<u8>, width: u32, height: u32) -> Self {
+    fn new(pixels: Vec<u8>, format: PixelFormat, width: u32, height: u32) -> Self {
+        // R, G, B, A
         assert_eq!(pixels.len() % 4, 0);
+
+        let pixels = match format {
+            PixelFormat::Rgba => pixels,
+            PixelFormat::Bgra => pixels
+                .chunks(4)
+                .flat_map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
+                .collect(),
+        };
+
         Self {
             pixels,
             width,
@@ -42,17 +52,12 @@ impl ImageInfo {
         }
     }
 
-    fn new_from_bgr(pixels: Vec<u8>, width: u32, height: u32) -> Self {
-        let pixels = pixels
-            .chunks(4)
-            .flat_map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
-            .collect();
-        Self::new(pixels, width, height)
-    }
-
     fn as_image(&self) -> Image<Handle> {
-        let handle = Handle::from_pixels(self.width, self.height, self.pixels.clone());
-        Image::new(handle)
+        Image::new(Handle::from_pixels(
+            self.width,
+            self.height,
+            self.pixels.clone(),
+        ))
     }
 }
 
