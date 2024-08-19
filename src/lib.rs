@@ -45,8 +45,6 @@ impl ImageInfo {
                 .collect(),
         };
 
-        println!("Image dimentions: width {:?}, height {:?}", width, height);
-
         Self {
             pixels,
             width,
