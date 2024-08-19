@@ -1,7 +1,6 @@
 use iced::keyboard;
 use iced::mouse::{self, Interaction};
 use iced::Size;
-use std::sync::{Arc, RwLock};
 // use iced::widget::image::{Handle, Image};
 use iced::Point;
 use rand::Rng;
@@ -28,14 +27,14 @@ pub trait BrowserEngine {
     fn force_need_render(&self);
     fn render(&mut self);
     fn size(&self) -> (u32, u32);
-    fn resize(&mut self, size: Size);
+    fn resize(&mut self, size: Size<u32>);
     fn pixel_buffer(&mut self) -> (PixelFormat, Vec<u8>);
 
     fn get_cursor(&self) -> Interaction;
     // fn get_icon(&self) -> Image<Handle>;
     fn goto_url(&self, url: &Url);
     fn has_loaded(&self) -> bool;
-    fn new_tab(&mut self, url: Url, size: Size) -> Tab<Self::Info>;
+    fn new_tab(&mut self, url: Url, size: Size<u32>) -> Tab<Self::Info>;
     fn get_tabs(&self) -> &Tabs<Self::Info>;
     fn get_tabs_mut(&mut self) -> &mut Tabs<Self::Info>;
 
@@ -61,19 +60,15 @@ pub trait TabInfo {
 // to automatically update it when it changes
 pub struct Tab<Info: TabInfo> {
     id: u32,
-    _url: Arc<RwLock<String>>,
-    _title: Arc<RwLock<String>>,
     view: ImageInfo,
     info: Info,
 }
 
 impl<Info: TabInfo> Tab<Info> {
-    pub fn new(_url: Arc<RwLock<String>>, _title: Arc<RwLock<String>>, info: Info) -> Self {
+    pub fn new(info: Info) -> Self {
         let id = rand::thread_rng().gen();
         Self {
             id,
-            _url,
-            _title,
             view: ImageInfo::default(),
             info,
         }

@@ -3,7 +3,7 @@ use iced::{self, Element, Length};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 use iced_aw::{TabBar as TB, TabLabel};
 
-use super::browser_widgets::{Message, TabSelectionType};
+use super::{Message, TabSelectionType};
 use crate::engines::{TabInfo, Tabs};
 
 // helper function to create navigation bar
@@ -22,7 +22,12 @@ pub fn tab_bar<Info: TabInfo>(tabs: &Tabs<Info>) -> Element<'static, Message> {
             TB::new(|index| Message::ChangeTab(TabSelectionType::Index(index))),
             |tab_bar, tab| {
                 let id = tab_bar.size();
-                tab_bar.push(id, TabLabel::Text(tab.title()))
+                let title = if tab.title().is_empty() {
+                    String::from("New Tab")
+                } else {
+                    tab.title()
+                };
+                tab_bar.push(id, TabLabel::Text(title))
             },
         )
         .set_active_tab(&active_tab)

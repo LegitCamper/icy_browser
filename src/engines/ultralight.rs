@@ -126,13 +126,11 @@ impl BrowserEngine for Ultralight {
     }
 
     fn size(&self) -> (u32, u32) {
-        (
-            self.tabs.get_current().info.view.width(),
-            self.tabs.get_current().info.view.height(),
-        )
+        let view = &self.tabs.get_current().info.view;
+        (view.width(), view.height())
     }
 
-    fn resize(&mut self, size: Size) {
+    fn resize(&mut self, size: Size<u32>) {
         let (width, height) = (size.width as u32, size.height as u32);
         self.tabs.tabs.iter().for_each(|tab| {
             tab.info.view.resize(width, height);
@@ -181,15 +179,10 @@ impl BrowserEngine for Ultralight {
         &mut self.tabs
     }
 
-    fn new_tab(&mut self, url: Url, size: Size) -> Tab<UltalightTabInfo> {
+    fn new_tab(&mut self, url: Url, size: Size<u32>) -> Tab<UltalightTabInfo> {
         let view = self
             .renderer
-            .create_view(
-                size.width as u32,
-                size.height as u32,
-                &self.view_config,
-                None,
-            )
+            .create_view(size.width, size.height, &self.view_config, None)
             .unwrap();
 
         let surface = view.surface().unwrap();
@@ -197,19 +190,6 @@ impl BrowserEngine for Ultralight {
 
         // RGBA
         debug_assert!(surface.row_bytes() / size.width as u32 == 4);
-
-        // set callbacks
-        let site_url = Arc::new(RwLock::new(url.to_string()));
-        let cb_url = site_url.clone();
-        view.set_change_url_callback(move |_view, url| {
-            *cb_url.write().unwrap() = url;
-        });
-
-        let title = Arc::new(RwLock::new(view.title().unwrap()));
-        let cb_title = title.clone();
-        view.set_change_title_callback(move |_view, title| {
-            *cb_title.write().unwrap() = title;
-        });
 
         let cursor = Arc::new(RwLock::new(mouse::Interaction::Idle));
         let cb_cursor = cursor.clone();
@@ -239,7 +219,7 @@ impl BrowserEngine for Ultralight {
             cursor,
         };
 
-        Tab::new(site_url, title, info)
+        Tab::new(info)
     }
 
     fn refresh(&self) {
@@ -265,9 +245,9 @@ impl BrowserEngine for Ultralight {
     fn scroll(&self, delta: ScrollDelta) {
         let scroll_event = match delta {
             ScrollDelta::Lines { x, y } => ScrollEvent::new(
-                ul_next::event::ScrollEventType::ScrollByPage,
-                x as i32,
-                y as i32,
+                ul_next::event::ScrollEventType::ScrollByPixel,
+                x as i32 * 100,
+                y as i32 * 100,
             )
             .unwrap(),
             ScrollDelta::Pixels { x, y } => ScrollEvent::new(

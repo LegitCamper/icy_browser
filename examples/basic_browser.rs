@@ -3,7 +3,7 @@
 use iced::{Sandbox, Settings, Theme};
 use iced_aw::BOOTSTRAP_FONT_BYTES;
 
-use icy_browser::{browser_widgets, BrowserWidget, Ultralight};
+use icy_browser::{widgets, BrowserWidget, Ultralight};
 
 fn main() -> Result<(), iced::Error> {
     // This imports `icons` for widgets
@@ -21,7 +21,7 @@ struct Browser {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    BrowserWidget(browser_widgets::Message),
+    BrowserWidget(widgets::Message),
 }
 
 impl Sandbox for Browser {

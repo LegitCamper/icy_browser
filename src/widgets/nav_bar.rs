@@ -2,7 +2,7 @@ use iced::widget::{row, text::LineHeight, text_input, tooltip, tooltip::Position
 use iced::{Element, Length};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 
-use super::browser_widgets::Message;
+use super::Message;
 
 pub fn nav_bar(url: &str) -> Element<Message> {
     let back = tooltip_helper(

@@ -7,8 +7,8 @@ pub use engines::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 #[cfg(feature = "ultralight")]
 pub use engines::ultralight::Ultralight;
 
-mod widgets;
-pub use widgets::{browser_widgets, nav_bar, tab_bar, BrowserWidget};
+pub mod widgets;
+pub use widgets::{nav_bar, tab_bar, BrowserWidget};
 
 // Image details for passing the view around
 #[derive(Debug, Clone)]
@@ -44,6 +44,8 @@ impl ImageInfo {
                 .flat_map(|chunk| [chunk[2], chunk[1], chunk[0], chunk[3]])
                 .collect(),
         };
+
+        println!("Image dimentions: width {:?}, height {:?}", width, height);
 
         Self {
             pixels,
