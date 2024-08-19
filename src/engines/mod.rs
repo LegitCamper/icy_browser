@@ -97,7 +97,7 @@ impl<Info: TabInfo> Tab<Info> {
 
 pub struct Tabs<Info: TabInfo> {
     tabs: Vec<Tab<Info>>,
-    current: u32,
+    history: Vec<u32>,
 }
 
 impl<Info: TabInfo> Default for Tabs<Info> {
@@ -110,7 +110,7 @@ impl<Info: TabInfo> Tabs<Info> {
     pub fn new() -> Self {
         Self {
             tabs: Vec::new(),
-            current: 0,
+            history: Vec::new(),
         }
     }
 
@@ -131,11 +131,14 @@ impl<Info: TabInfo> Tabs<Info> {
     }
 
     pub fn get_current_id(&self) -> u32 {
-        self.current
+        self.history
+            .last()
+            .expect("No tab in history to get current from")
+            .to_owned()
     }
 
     pub fn set_current_id(&mut self, id: u32) {
-        self.current = id
+        self.history.push(id)
     }
 
     pub fn tabs(&self) -> &Vec<Tab<Info>> {
@@ -150,26 +153,18 @@ impl<Info: TabInfo> Tabs<Info> {
 
     /// Returns the newly active tab
     pub fn remove(&mut self, id: u32) -> u32 {
-        // TODO: have list of prevous tabs instead
-        if self.current == id {
-            for tab in self.tabs.iter().rev() {
-                if tab.id != id {
-                    self.current = tab.id;
-                    break;
-                }
-            }
-        }
+        self.history.retain(|tab_id| *tab_id != id);
 
         self.tabs.retain(|tab| tab.id != id);
-        self.current
+        self.get_current_id()
     }
 
     pub fn get_current(&self) -> &Tab<Info> {
-        self.get(self.current)
+        self.get(self.get_current_id())
     }
 
     pub fn get_current_mut(&mut self) -> &mut Tab<Info> {
-        self.get_mut(self.current)
+        self.get_mut(self.get_current_id())
     }
 
     pub fn get(&self, id: u32) -> &Tab<Info> {
