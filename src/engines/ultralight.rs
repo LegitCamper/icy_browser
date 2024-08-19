@@ -131,10 +131,9 @@ impl BrowserEngine for Ultralight {
     }
 
     fn resize(&mut self, size: Size<u32>) {
-        let (width, height) = (size.width as u32, size.height as u32);
         self.tabs.tabs.iter().for_each(|tab| {
-            tab.info.view.resize(width, height);
-            tab.info.surface.resize(width, height);
+            tab.info.view.resize(size.width, size.height);
+            tab.info.surface.resize(size.width, size.height);
         })
     }
 
@@ -189,7 +188,7 @@ impl BrowserEngine for Ultralight {
         view.load_url(url.as_ref()).unwrap();
 
         // RGBA
-        debug_assert!(surface.row_bytes() / size.width as u32 == 4);
+        debug_assert!(surface.row_bytes() / size.width == 4);
 
         let cursor = Arc::new(RwLock::new(mouse::Interaction::Idle));
         let cb_cursor = cursor.clone();
