@@ -19,7 +19,7 @@ pub enum Message {
     GoForward,
     Refresh,
     GoHome,
-    GoUrl(String),
+    GoToUrl(String),
     ChangeTab(TabSelectionType),
     CloseTab(TabSelectionType),
     CreateTab,
@@ -204,7 +204,7 @@ where
             Message::GoHome => {
                 self.engine().goto_url(&self.home);
             }
-            Message::GoUrl(url) => {
+            Message::GoToUrl(url) => {
                 self.engine().goto_url(&to_url(&url).unwrap());
             }
             Message::UpdateUrl => {
