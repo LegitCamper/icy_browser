@@ -53,7 +53,7 @@ impl ImageInfo {
     }
 
     fn as_image(&self) -> Image<Handle> {
-        Image::new(Handle::from_pixels(
+        Image::new(Handle::from_rgba(
             self.width,
             self.height,
             self.pixels.clone(),

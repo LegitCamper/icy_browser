@@ -2,7 +2,6 @@ use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
 use iced::{Point, Size};
 use smol_str::SmolStr;
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use ul_next::{
     config::Config,
@@ -271,6 +270,8 @@ impl BrowserEngine for Ultralight {
                 location,
                 modifiers,
                 text,
+                modified_key: _,
+                physical_key: _,
             } => iced_key_to_ultralight_key(
                 KeyPress::Press,
                 Some(key),

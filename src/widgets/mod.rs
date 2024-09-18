@@ -1,4 +1,5 @@
-use iced::{keyboard, mouse, widget::column, Element, Point, Size};
+use iced::keyboard::{self, key};
+use iced::{event::Event, mouse, widget::column, Element, Point, Size};
 use iced_on_focus_widget::hoverable;
 use url::Url;
 
@@ -28,6 +29,9 @@ pub enum Message {
     SendKeyboardEvent(keyboard::Event),
     SendMouseEvent(Point, mouse::Event),
     UpdateViewSize(Size<u32>),
+    Event(Event),
+    ShowOverlay,
+    HideOverlay,
 }
 
 /// Allows different widgets to interact in their native way
@@ -114,15 +118,7 @@ where
     pub fn build(self) -> Self {
         assert!(self.engine.is_some());
 
-        let mut build = Self {
-            engine: self.engine,
-            home: self.home,
-            tab_bar: self.tab_bar,
-            nav_bar: self.nav_bar,
-            url: self.url,
-            browser_view: self.browser_view,
-            view_size: self.view_size,
-        };
+        let mut build = Self { ..self };
         build.update(Message::CreateTab);
         build
     }
@@ -211,6 +207,23 @@ where
                 self.url = self.engine().get_tabs().get_current().url();
             }
             Message::UrlChanged(url) => self.url = url,
+            Message::ShowOverlay => {
+                // self.show_modal = true;
+                // widget::focus_next()
+            }
+            Message::HideOverlay => {
+                // self.hide_modal();
+            }
+
+            Message::Event(event) => match event {
+                Event::Keyboard(keyboard::Event::KeyPressed {
+                    key: keyboard::Key::Named(key::Named::Escape),
+                    ..
+                }) => {
+                    // self.hide_modal();
+                }
+                _ => (),
+            },
         }
 
         if self.engine().has_loaded() {
