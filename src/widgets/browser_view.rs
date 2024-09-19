@@ -111,18 +111,15 @@ where
         match event {
             Event::Keyboard(event) => {
                 shell.publish((self.keyboard_event)(event));
-                Status::Captured
             }
             Event::Mouse(event) => {
                 if let Some(point) = cursor.position_in(layout.bounds()) {
                     shell.publish((self.mouse_event)(point, event));
-                    Status::Captured
-                } else {
-                    Status::Ignored
                 }
             }
-            _ => Status::Ignored,
+            _ => (),
         }
+        Status::Ignored
     }
 }
 
