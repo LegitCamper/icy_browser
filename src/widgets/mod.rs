@@ -13,8 +13,8 @@ pub use nav_bar::nav_bar;
 mod tab_bar;
 pub use tab_bar::tab_bar;
 
-mod overlay;
-pub use overlay::overlay;
+mod command_window;
+pub use command_window::command_window;
 
 use crate::{check_shortcut, engines::BrowserEngine, to_url, ImageInfo, Shortcuts};
 
@@ -368,7 +368,7 @@ where
             !self.show_overlay,
         );
         if self.show_overlay {
-            column = column.push(overlay(browser_view, Message::HideOverlay))
+            column = column.push(command_window(browser_view, Message::HideOverlay))
         } else {
             column = column.push(browser_view);
         }
