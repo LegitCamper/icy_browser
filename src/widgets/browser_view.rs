@@ -18,8 +18,16 @@ pub fn browser_view<Message>(
     send_bounds: Box<dyn Fn(Size<u32>) -> Message>,
     keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
     mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
+    can_type: bool,
 ) -> BrowserView<Message> {
-    BrowserView::new(bounds, image, send_bounds, keyboard_event, mouse_event)
+    BrowserView::new(
+        bounds,
+        image,
+        send_bounds,
+        keyboard_event,
+        mouse_event,
+        can_type,
+    )
 }
 
 pub struct BrowserView<Message> {
@@ -28,6 +36,7 @@ pub struct BrowserView<Message> {
     send_bounds: Box<dyn Fn(Size<u32>) -> Message>,
     keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
     mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
+    can_interact: bool, // wheather or not to allow typing - useful when overlay enabled
 }
 
 impl<Message> BrowserView<Message> {
@@ -37,6 +46,7 @@ impl<Message> BrowserView<Message> {
         send_bounds: Box<dyn Fn(Size<u32>) -> Message>,
         keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
         mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
+        can_type: bool,
     ) -> Self {
         Self {
             bounds,
@@ -44,6 +54,7 @@ impl<Message> BrowserView<Message> {
             send_bounds,
             keyboard_event,
             mouse_event,
+            can_interact: can_type,
         }
     }
 }
@@ -101,23 +112,25 @@ where
         shell: &mut Shell<'_, Message>,
         _viewport: &Rectangle,
     ) -> event::Status {
-        // Send updates back if bounds change
-        // convert to u32 because Image takes u32
-        let size = Size::new(layout.bounds().width as u32, layout.bounds().height as u32);
-        if self.bounds != size {
-            shell.publish((self.send_bounds)(size));
-        }
+        if self.can_interact {
+            // Send updates back if bounds change
+            // convert to u32 because Image takes u32
+            let size = Size::new(layout.bounds().width as u32, layout.bounds().height as u32);
+            if self.bounds != size {
+                shell.publish((self.send_bounds)(size));
+            }
 
-        match event {
-            Event::Keyboard(event) => {
-                shell.publish((self.keyboard_event)(event));
-            }
-            Event::Mouse(event) => {
-                if let Some(point) = cursor.position_in(layout.bounds()) {
-                    shell.publish((self.mouse_event)(point, event));
+            match event {
+                Event::Keyboard(event) => {
+                    shell.publish((self.keyboard_event)(event));
                 }
+                Event::Mouse(event) => {
+                    if let Some(point) = cursor.position_in(layout.bounds()) {
+                        shell.publish((self.mouse_event)(point, event));
+                    }
+                }
+                _ => (),
             }
-            _ => (),
         }
         Status::Ignored
     }

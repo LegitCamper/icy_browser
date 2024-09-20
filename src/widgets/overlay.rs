@@ -8,7 +8,7 @@ pub fn overlay<'a, Message>(
 where
     Message: Clone + 'a,
 {
-    let content = text("Overlay content here");
+    let content = text("Overlay content here").center();
 
     stack![
         base.into(),

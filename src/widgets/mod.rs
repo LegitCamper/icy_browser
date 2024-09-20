@@ -119,7 +119,6 @@ where
 
     pub fn with_custom_shortcuts(mut self, shortcuts: Shortcuts) -> Self {
         self.shortcuts = shortcuts;
-        // TODO: Check that shortcuts dont have duplicates
         self
     }
 
@@ -127,7 +126,7 @@ where
         assert!(self.engine.is_some());
 
         let mut build = Self { ..self };
-        build.update(Message::CreateTab);
+        let _ = build.update(Message::CreateTab); // disregaurd task::none() for update
         build
     }
 
@@ -191,13 +190,7 @@ where
     }
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
-        println!("message: {message:?}");
         let task = match message {
-            Message::Event(Event::Keyboard(key)) => {
-                println!("key: {:?}", key);
-                proccess_keys(key, &self.shortcuts, self.show_overlay)
-            }
-
             Message::UpdateViewSize(size) => {
                 self.view_size = size;
                 self.engine_mut().resize(size);
@@ -228,7 +221,7 @@ where
             Message::CloseTab(index_type) => {
                 // ensure there is always at least one tab
                 if self.engine().get_tabs().tabs().len() == 1 {
-                    self.update(Message::CreateTab);
+                    let _ = self.update(Message::CreateTab); // ignore task
                 }
 
                 let id = match index_type {
@@ -294,6 +287,60 @@ where
                 self.show_overlay = false;
                 Task::none()
             }
+            Message::Event(Event::Keyboard(key)) => {
+                if let iced::keyboard::Event::KeyPressed {
+                    key,
+                    modified_key: _,
+                    physical_key: _,
+                    location: _,
+                    modifiers,
+                    text: _,
+                } = key
+                {
+                    // Default behaviors
+                    if key == keyboard::Key::Named(key::Named::Escape) && self.show_overlay {
+                        return Task::done(Message::HideOverlay);
+                    }
+
+                    // Shortcut (Customizable) behaviors
+                    for shortcut in self.shortcuts.iter() {
+                        if check_shortcut(shortcut, &key, &modifiers) {
+                            match shortcut.0 {
+                                crate::ShortcutType::GoBackward => {
+                                    return Task::done(Message::GoBackward)
+                                }
+                                crate::ShortcutType::GoForward => {
+                                    return Task::done(Message::GoForward)
+                                }
+                                crate::ShortcutType::Refresh => {
+                                    return Task::done(Message::Refresh)
+                                }
+                                crate::ShortcutType::GoHome => return Task::done(Message::GoHome),
+                                crate::ShortcutType::CloseCurrentTab => {
+                                    return Task::done(Message::CloseCurrentTab)
+                                }
+                                crate::ShortcutType::CreateTab => {
+                                    return Task::done(Message::CreateTab)
+                                }
+                                crate::ShortcutType::ToggleOverlay => {
+                                    if self.show_overlay {
+                                        return Task::done(Message::HideOverlay);
+                                    } else {
+                                        return Task::done(Message::ShowOverlay);
+                                    }
+                                }
+                                crate::ShortcutType::ShowOverlay => {
+                                    return Task::done(Message::ShowOverlay)
+                                }
+                                crate::ShortcutType::HideOverlay => {
+                                    return Task::done(Message::HideOverlay)
+                                }
+                            }
+                        }
+                    }
+                }
+                Task::none()
+            }
             _ => Task::none(),
         };
 
@@ -318,6 +365,7 @@ where
             Box::new(Message::UpdateViewSize),
             Box::new(Message::SendKeyboardEvent),
             Box::new(Message::SendMouseEvent),
+            !self.show_overlay,
         );
         if self.show_overlay {
             column = column.push(overlay(browser_view, Message::HideOverlay))
@@ -326,76 +374,5 @@ where
         }
 
         column.into()
-    }
-}
-
-fn proccess_keys(
-    key: iced::keyboard::Event,
-    shortcuts: &Shortcuts,
-    show_overlay: bool,
-) -> Task<Message> {
-    println!("pressed key: {:?}", key);
-    if let iced::keyboard::Event::KeyPressed {
-        key,
-        modified_key: _,
-        physical_key: _,
-        location: _,
-        modifiers,
-        text: _,
-    } = key
-    {
-        println!("key: {:?}", key);
-        println!("mod: {:?}", modifiers);
-        let mut tasks = Vec::new();
-        for shortcut in shortcuts.iter() {
-            match shortcut {
-                crate::Shortcut::GoBackward(keys) => {
-                    if check_shortcut(keys, &key, &modifiers) {
-                        tasks.push(Task::done(Message::GoBackward))
-                    }
-                }
-                crate::Shortcut::GoForward(keys) => {
-                    if check_shortcut(keys, &key, &modifiers) {
-                        tasks.push(Task::done(Message::GoForward))
-                    }
-                }
-                crate::Shortcut::Refresh(keys) => {
-                    if check_shortcut(keys, &key, &modifiers) {
-                        tasks.push(Task::done(Message::Refresh))
-                    }
-                }
-                crate::Shortcut::GoHome(keys) => {
-                    if check_shortcut(keys, &key, &modifiers) {
-                        tasks.push(Task::done(Message::GoHome))
-                    }
-                }
-                crate::Shortcut::CloseTab(keys) => {
-                    if check_shortcut(keys, &key, &modifiers) {
-                        tasks.push(Task::done(Message::CloseCurrentTab))
-                    }
-                }
-                crate::Shortcut::CreateTab(keys) => {
-                    if check_shortcut(keys, &key, &modifiers) {
-                        tasks.push(Task::done(Message::CreateTab))
-                    }
-                }
-                crate::Shortcut::ShowOverlay(keys) => {
-                    if check_shortcut(keys, &key, &modifiers) {
-                        tasks.push(Task::done(Message::ShowOverlay))
-                    }
-                }
-                crate::Shortcut::HideOverlay(keys) => {
-                    if check_shortcut(keys, &key, &modifiers) {
-                        tasks.push(Task::done(Message::HideOverlay))
-                    }
-                }
-            }
-        }
-        if key == keyboard::Key::Named(key::Named::Escape) && show_overlay {
-            tasks.push(Task::done(Message::HideOverlay));
-        }
-        Task::batch(tasks)
-    } else {
-        Task::none()
     }
 }
