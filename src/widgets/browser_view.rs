@@ -96,11 +96,11 @@ where
 
             match event {
                 Event::Keyboard(event) => {
-                    shell.publish(Message::SendKeyboardEvent(event));
+                    shell.publish(Message::SendKeyboardEvent(Some(event)));
                 }
                 Event::Mouse(event) => {
                     if let Some(point) = cursor.position_in(layout.bounds()) {
-                        shell.publish(Message::SendMouseEvent(point, event));
+                        shell.publish(Message::SendMouseEvent(point, Some(event)));
                     }
                 }
                 _ => (),

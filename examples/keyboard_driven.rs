@@ -65,7 +65,7 @@ impl Browser {
             Message::Update => self.widgets.force_update().map(Message::BrowserWidget),
             Message::Event(event) => self
                 .widgets
-                .update(widgets::Message::Event(event))
+                .update(widgets::Message::Event(Some(event)))
                 .map(Message::BrowserWidget),
         }
     }

@@ -1,14 +1,42 @@
 use iced::widget::{center, column, container, mouse_area, opaque, stack, text_input};
-use iced::{border, Color, Element, Theme};
+use iced::{border, Color, Element, Font, Length, Theme};
+use iced_aw::SelectionList;
+use strum::IntoEnumIterator;
 
 use super::Message;
 
+pub struct CommandWindowState {
+    pub query: String,
+    actions: Vec<String>,
+    pub selected_action: String,
+    pub selected_index: usize,
+}
+
+impl CommandWindowState {
+    pub fn new() -> Self {
+        Self {
+            query: String::new(),
+            actions: Message::iter().map(|e| e.clone().to_string()).collect(),
+            selected_action: String::new(),
+            selected_index: 0,
+        }
+    }
+}
+
 pub fn command_window<'a>(
     base: impl Into<Element<'a, Message>>,
-    query: &str,
+    state: &'a CommandWindowState,
 ) -> Element<'a, Message> {
     let window = container(column![
-        text_input("Command Menu", query).on_input(Message::QueryChanged),
+        text_input("Command Menu", &state.query).on_input(Message::QueryChanged),
+        SelectionList::new(&state.actions, Message::CommandSelectionChanged)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .style(|theme: &Theme, _| iced_aw::style::selection_list::Style {
+                text_color: theme.palette().text.into(),
+                background: theme.palette().background.into(),
+                ..Default::default()
+            }),
     ])
     .padding(10)
     .center(600)

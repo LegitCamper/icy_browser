@@ -1,7 +1,11 @@
+use command_window::CommandWindowState;
 use iced::keyboard::{self, key};
 use iced::widget::{self, column};
 use iced::{event::Event, mouse, Element, Point, Size, Task};
 use iced_on_focus_widget::hoverable;
+use nav_bar::NavBarState;
+use std::string::ToString;
+use strum_macros::{Display, EnumIter};
 use url::Url;
 
 mod browser_view;
@@ -18,27 +22,43 @@ pub use command_window::command_window;
 
 use crate::{engines::BrowserEngine, shortcut::check_shortcut, to_url, ImageInfo, Shortcuts};
 
-#[derive(Debug, Clone, PartialEq)]
+// Options exist only to have defaults for EnumIter
+#[derive(Debug, Clone, PartialEq, Display, EnumIter)]
 pub enum Message {
+    // Commands
+    #[strum(to_string = "Go Backward")]
     GoBackward,
+    #[strum(to_string = "Go Forward")]
     GoForward,
     Refresh,
+    #[strum(to_string = "Go Home")]
     GoHome,
+    #[strum(to_string = "Go To Url")]
     GoToUrl(String),
+    #[strum(to_string = "Change Tab")]
     ChangeTab(TabSelectionType),
+    #[strum(to_string = "Close Tab")]
     CloseTab(TabSelectionType),
+    #[strum(to_string = "Close Tab")]
     CloseCurrentTab,
+    #[strum(to_string = "New Tab")]
     CreateTab,
+    #[strum(to_string = "Toggle Command Palatte")]
+    ToggleOverlay,
+    #[strum(to_string = "Show Command Palatte")]
+    ShowOverlay,
+    #[strum(to_string = "Hide Command Palatte")]
+    HideOverlay,
+
+    // Internal only - for widgets
     UrlChanged(String),
     UpdateUrl,
     QueryChanged(String),
-    SendKeyboardEvent(keyboard::Event),
-    SendMouseEvent(Point, mouse::Event),
+    CommandSelectionChanged(usize, String),
+    SendKeyboardEvent(Option<keyboard::Event>),
+    SendMouseEvent(Point, Option<mouse::Event>),
     UpdateViewSize(Size<u32>),
-    Event(Event),
-    ToggleOverlay,
-    ShowOverlay,
-    HideOverlay,
+    Event(Option<Event>),
 }
 
 /// Allows different widgets to interact in their native way
@@ -47,12 +67,17 @@ pub enum TabSelectionType {
     Id(u32),
     Index(usize),
 }
+impl Default for TabSelectionType {
+    fn default() -> Self {
+        TabSelectionType::Index(0)
+    }
+}
 
 pub struct BrowserWidget<Engine: BrowserEngine> {
     engine: Option<Engine>,
     home: Url,
-    url: String,   // State of url bar
-    query: String, // State of Command window
+    nav_bar_state: NavBarState,
+    command_window_state: CommandWindowState,
     with_tab_bar: bool,
     with_nav_bar: bool,
     show_overlay: bool,
@@ -69,8 +94,8 @@ where
         Self {
             engine: None,
             home,
-            url: String::new(),
-            query: String::new(),
+            nav_bar_state: NavBarState::new(),
+            command_window_state: CommandWindowState::new(),
             with_tab_bar: false,
             with_nav_bar: false,
             show_overlay: false,
@@ -201,11 +226,13 @@ where
                 Task::none()
             }
             Message::SendKeyboardEvent(event) => {
-                self.engine().handle_keyboard_event(event);
+                self.engine()
+                    .handle_keyboard_event(event.expect("Value cannot be none"));
                 Task::none()
             }
             Message::SendMouseEvent(point, event) => {
-                self.engine_mut().handle_mouse_event(point, event);
+                self.engine_mut()
+                    .handle_mouse_event(point, event.expect("Value cannot be none"));
                 Task::none()
             }
             Message::ChangeTab(index_type) => {
@@ -216,7 +243,7 @@ where
                     }
                 };
                 self.engine_mut().get_tabs_mut().set_current_id(id);
-                self.url = self.engine().get_tabs().get_current().url();
+                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
                 Task::none()
             }
             Message::CloseCurrentTab => Task::done(Message::CloseTab(TabSelectionType::Id(
@@ -235,11 +262,11 @@ where
                     }
                 };
                 self.engine_mut().get_tabs_mut().remove(id);
-                self.url = self.engine().get_tabs().get_current().url();
+                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
                 Task::none()
             }
             Message::CreateTab => {
-                self.url = self.home.to_string();
+                self.nav_bar_state.0 = self.home.to_string();
                 let home = self.home.clone();
                 let bounds = self.view_size;
                 let tab = self.engine_mut().new_tab(
@@ -255,12 +282,12 @@ where
             }
             Message::GoBackward => {
                 self.engine().go_back();
-                self.url = self.engine().get_tabs().get_current().url();
+                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
                 Task::none()
             }
             Message::GoForward => {
                 self.engine().go_forward();
-                self.url = self.engine().get_tabs().get_current().url();
+                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
                 Task::none()
             }
             Message::Refresh => {
@@ -276,24 +303,27 @@ where
                 Task::none()
             }
             Message::UpdateUrl => {
-                self.url = self.engine().get_tabs().get_current().url();
+                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
                 Task::none()
             }
             Message::UrlChanged(url) => {
-                self.url = url;
+                self.nav_bar_state.0 = url;
                 Task::none()
             }
             Message::QueryChanged(query) => {
-                self.query = query;
+                self.command_window_state.query = query;
+                Task::none()
+            }
+            Message::CommandSelectionChanged(index, name) => {
+                self.command_window_state.selected_index = index;
+                self.command_window_state.selected_action = name;
                 Task::none()
             }
             Message::ToggleOverlay => {
                 if self.show_overlay {
-                    self.show_overlay = false;
-                    widget::focus_next()
+                    Task::done(Message::HideOverlay)
                 } else {
-                    self.show_overlay = true;
-                    widget::focus_next()
+                    Task::done(Message::ShowOverlay)
                 }
             }
             Message::ShowOverlay => {
@@ -302,11 +332,11 @@ where
             }
             Message::HideOverlay => {
                 self.show_overlay = false;
-                Task::none()
+                widget::focus_next()
             }
             Message::Event(event) => {
                 match event {
-                    Event::Keyboard(key) => {
+                    Some(Event::Keyboard(key)) => {
                         if let iced::keyboard::Event::KeyPressed {
                             key,
                             modified_key: _,
@@ -349,7 +379,8 @@ where
             column = column.push(tab_bar(self.engine().get_tabs()))
         }
         if self.with_nav_bar {
-            column = column.push(hoverable(nav_bar(&self.url)).on_focus_change(Message::UpdateUrl))
+            column = column
+                .push(hoverable(nav_bar(&self.nav_bar_state)).on_focus_change(Message::UpdateUrl))
         }
 
         let browser_view = browser_view(
@@ -358,7 +389,7 @@ where
             !self.show_overlay,
         );
         if self.show_overlay {
-            column = column.push(command_window(browser_view, &self.query))
+            column = column.push(command_window(browser_view, &self.command_window_state))
         } else {
             column = column.push(browser_view);
         }
