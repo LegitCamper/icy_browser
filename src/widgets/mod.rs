@@ -16,7 +16,7 @@ pub use tab_bar::tab_bar;
 mod command_window;
 pub use command_window::command_window;
 
-use crate::{check_shortcut, engines::BrowserEngine, to_url, ImageInfo, Shortcuts};
+use crate::{engines::BrowserEngine, shortcut::check_shortcut, to_url, ImageInfo, Shortcuts};
 
 #[derive(Debug, Clone)]
 pub enum Message {
