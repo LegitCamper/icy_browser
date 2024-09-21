@@ -1,16 +1,14 @@
 use iced::keyboard::{Key, Modifiers};
 
+use super::widgets::Message;
+
 pub struct ShortcutBuilder(Shortcuts);
 impl ShortcutBuilder {
     pub fn new() -> Self {
         ShortcutBuilder(Vec::new())
     }
 
-    pub fn add_shortcut(
-        mut self,
-        shortcut_action: ShortcutType,
-        shortcut_keys: Vec<KeyType>,
-    ) -> Self {
+    pub fn add_shortcut(mut self, shortcut_action: Message, shortcut_keys: Vec<KeyType>) -> Self {
         if self.0.iter().filter(|sc| sc.0 == shortcut_action).count() != 0 {
             panic!("Tried to add a duplicated shortcut");
         }
@@ -73,23 +71,10 @@ pub enum KeyType {
     Modifier(ShortcutModifier),
 }
 /// Configures Widget Keyboard Shortcut
-pub type Shortcut = (ShortcutType, Vec<KeyType>);
+pub type Shortcut = (Message, Vec<KeyType>);
 
 /// Configures Widget Keyboard Shortcuts
 pub type Shortcuts = Vec<Shortcut>;
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ShortcutType {
-    GoBackward,
-    GoForward,
-    Refresh,
-    GoHome,
-    CloseCurrentTab,
-    CreateTab,
-    ToggleOverlay,
-    ShowOverlay,
-    HideOverlay,
-}
 
 pub fn check_shortcut(shortcut: &Shortcut, key: &Key, modifiers: &Modifiers) -> bool {
     shortcut

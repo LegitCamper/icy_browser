@@ -8,10 +8,10 @@ pub use engines::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 pub use engines::ultralight::Ultralight;
 
 pub mod widgets;
-pub use widgets::{nav_bar, tab_bar, BrowserWidget};
+pub use widgets::{nav_bar, tab_bar, BrowserWidget, Message};
 
 mod shortcut;
-pub use shortcut::{KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, ShortcutType, Shortcuts};
+pub use shortcut::{KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts};
 
 // Image details for passing the view around
 #[derive(Debug, Clone)]

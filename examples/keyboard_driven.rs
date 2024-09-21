@@ -7,7 +7,8 @@ use iced_aw::BOOTSTRAP_FONT_BYTES;
 use std::time::Duration;
 
 use icy_browser::{
-    widgets, BrowserWidget, KeyType, ShortcutBuilder, ShortcutModifier, ShortcutType, Ultralight,
+    widgets, BrowserWidget, KeyType, Message as WidgetMessage, ShortcutBuilder, ShortcutModifier,
+    Ultralight,
 };
 
 fn main() -> iced::Result {
@@ -40,7 +41,7 @@ impl Default for Browser {
     fn default() -> Self {
         let shortcuts = ShortcutBuilder::new()
             .add_shortcut(
-                ShortcutType::ToggleOverlay,
+                WidgetMessage::ToggleOverlay,
                 vec![
                     KeyType::Modifier(ShortcutModifier::Ctrl),
                     KeyType::Key(iced::keyboard::Key::Character("e".into())),

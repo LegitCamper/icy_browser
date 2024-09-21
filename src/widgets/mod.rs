@@ -18,7 +18,7 @@ pub use command_window::command_window;
 
 use crate::{engines::BrowserEngine, shortcut::check_shortcut, to_url, ImageInfo, Shortcuts};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Message {
     GoBackward,
     GoForward,
@@ -36,12 +36,13 @@ pub enum Message {
     SendMouseEvent(Point, mouse::Event),
     UpdateViewSize(Size<u32>),
     Event(Event),
+    ToggleOverlay,
     ShowOverlay,
     HideOverlay,
 }
 
 /// Allows different widgets to interact in their native way
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TabSelectionType {
     Id(u32),
     Index(usize),
@@ -286,6 +287,15 @@ where
                 self.query = query;
                 Task::none()
             }
+            Message::ToggleOverlay => {
+                if self.show_overlay {
+                    self.show_overlay = false;
+                    widget::focus_next()
+                } else {
+                    self.show_overlay = true;
+                    widget::focus_next()
+                }
+            }
             Message::ShowOverlay => {
                 self.show_overlay = true;
                 widget::focus_next()
@@ -315,39 +325,7 @@ where
                             // Shortcut (Customizable) behaviors
                             for shortcut in self.shortcuts.iter() {
                                 if check_shortcut(shortcut, &key, &modifiers) {
-                                    match shortcut.0 {
-                                        crate::ShortcutType::GoBackward => {
-                                            return Task::done(Message::GoBackward)
-                                        }
-                                        crate::ShortcutType::GoForward => {
-                                            return Task::done(Message::GoForward)
-                                        }
-                                        crate::ShortcutType::Refresh => {
-                                            return Task::done(Message::Refresh)
-                                        }
-                                        crate::ShortcutType::GoHome => {
-                                            return Task::done(Message::GoHome)
-                                        }
-                                        crate::ShortcutType::CloseCurrentTab => {
-                                            return Task::done(Message::CloseCurrentTab)
-                                        }
-                                        crate::ShortcutType::CreateTab => {
-                                            return Task::done(Message::CreateTab)
-                                        }
-                                        crate::ShortcutType::ToggleOverlay => {
-                                            if self.show_overlay {
-                                                return Task::done(Message::HideOverlay);
-                                            } else {
-                                                return Task::done(Message::ShowOverlay);
-                                            }
-                                        }
-                                        crate::ShortcutType::ShowOverlay => {
-                                            return Task::done(Message::ShowOverlay)
-                                        }
-                                        crate::ShortcutType::HideOverlay => {
-                                            return Task::done(Message::HideOverlay)
-                                        }
-                                    }
+                                    return Task::done(shortcut.0.clone());
                                 }
                             }
                         }
