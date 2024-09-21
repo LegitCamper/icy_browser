@@ -42,7 +42,7 @@ impl Default for Browser {
             .add_shortcut(
                 ShortcutType::ToggleOverlay,
                 vec![
-                    KeyType::Modifier(ShortcutModifier::Alt),
+                    KeyType::Modifier(ShortcutModifier::Ctrl),
                     KeyType::Key(iced::keyboard::Key::Character("e".into())),
                 ],
             )

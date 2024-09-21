@@ -31,6 +31,7 @@ pub enum Message {
     CreateTab,
     UrlChanged(String),
     UpdateUrl,
+    QueryChanged(String),
     SendKeyboardEvent(keyboard::Event),
     SendMouseEvent(Point, mouse::Event),
     UpdateViewSize(Size<u32>),
@@ -49,7 +50,8 @@ pub enum TabSelectionType {
 pub struct BrowserWidget<Engine: BrowserEngine> {
     engine: Option<Engine>,
     home: Url,
-    url: String,
+    url: String,   // State of url bar
+    query: String, // State of Command window
     with_tab_bar: bool,
     with_nav_bar: bool,
     show_overlay: bool,
@@ -67,6 +69,7 @@ where
             engine: None,
             home,
             url: String::new(),
+            query: String::new(),
             with_tab_bar: false,
             with_nav_bar: false,
             show_overlay: false,
@@ -279,6 +282,10 @@ where
                 self.url = url;
                 Task::none()
             }
+            Message::QueryChanged(query) => {
+                self.query = query;
+                Task::none()
+            }
             Message::ShowOverlay => {
                 self.show_overlay = true;
                 widget::focus_next()
@@ -287,61 +294,69 @@ where
                 self.show_overlay = false;
                 Task::none()
             }
-            Message::Event(Event::Keyboard(key)) => {
-                if let iced::keyboard::Event::KeyPressed {
-                    key,
-                    modified_key: _,
-                    physical_key: _,
-                    location: _,
-                    modifiers,
-                    text: _,
-                } = key
-                {
-                    // Default behaviors
-                    if key == keyboard::Key::Named(key::Named::Escape) && self.show_overlay {
-                        return Task::done(Message::HideOverlay);
-                    }
+            Message::Event(event) => {
+                match event {
+                    Event::Keyboard(key) => {
+                        if let iced::keyboard::Event::KeyPressed {
+                            key,
+                            modified_key: _,
+                            physical_key: _,
+                            location: _,
+                            modifiers,
+                            text: _,
+                        } = key
+                        {
+                            // Default behaviors
+                            if key == keyboard::Key::Named(key::Named::Escape) && self.show_overlay
+                            {
+                                return Task::done(Message::HideOverlay);
+                            }
 
-                    // Shortcut (Customizable) behaviors
-                    for shortcut in self.shortcuts.iter() {
-                        if check_shortcut(shortcut, &key, &modifiers) {
-                            match shortcut.0 {
-                                crate::ShortcutType::GoBackward => {
-                                    return Task::done(Message::GoBackward)
-                                }
-                                crate::ShortcutType::GoForward => {
-                                    return Task::done(Message::GoForward)
-                                }
-                                crate::ShortcutType::Refresh => {
-                                    return Task::done(Message::Refresh)
-                                }
-                                crate::ShortcutType::GoHome => return Task::done(Message::GoHome),
-                                crate::ShortcutType::CloseCurrentTab => {
-                                    return Task::done(Message::CloseCurrentTab)
-                                }
-                                crate::ShortcutType::CreateTab => {
-                                    return Task::done(Message::CreateTab)
-                                }
-                                crate::ShortcutType::ToggleOverlay => {
-                                    if self.show_overlay {
-                                        return Task::done(Message::HideOverlay);
-                                    } else {
-                                        return Task::done(Message::ShowOverlay);
+                            // Shortcut (Customizable) behaviors
+                            for shortcut in self.shortcuts.iter() {
+                                if check_shortcut(shortcut, &key, &modifiers) {
+                                    match shortcut.0 {
+                                        crate::ShortcutType::GoBackward => {
+                                            return Task::done(Message::GoBackward)
+                                        }
+                                        crate::ShortcutType::GoForward => {
+                                            return Task::done(Message::GoForward)
+                                        }
+                                        crate::ShortcutType::Refresh => {
+                                            return Task::done(Message::Refresh)
+                                        }
+                                        crate::ShortcutType::GoHome => {
+                                            return Task::done(Message::GoHome)
+                                        }
+                                        crate::ShortcutType::CloseCurrentTab => {
+                                            return Task::done(Message::CloseCurrentTab)
+                                        }
+                                        crate::ShortcutType::CreateTab => {
+                                            return Task::done(Message::CreateTab)
+                                        }
+                                        crate::ShortcutType::ToggleOverlay => {
+                                            if self.show_overlay {
+                                                return Task::done(Message::HideOverlay);
+                                            } else {
+                                                return Task::done(Message::ShowOverlay);
+                                            }
+                                        }
+                                        crate::ShortcutType::ShowOverlay => {
+                                            return Task::done(Message::ShowOverlay)
+                                        }
+                                        crate::ShortcutType::HideOverlay => {
+                                            return Task::done(Message::HideOverlay)
+                                        }
                                     }
-                                }
-                                crate::ShortcutType::ShowOverlay => {
-                                    return Task::done(Message::ShowOverlay)
-                                }
-                                crate::ShortcutType::HideOverlay => {
-                                    return Task::done(Message::HideOverlay)
                                 }
                             }
                         }
+                        Task::none()
                     }
+                    // Other unwatched events
+                    _ => Task::none(),
                 }
-                Task::none()
             }
-            _ => Task::none(),
         };
 
         self.update_engine();
@@ -368,7 +383,7 @@ where
             !self.show_overlay,
         );
         if self.show_overlay {
-            column = column.push(command_window(browser_view, Message::HideOverlay))
+            column = column.push(command_window(browser_view, &self.query))
         } else {
             column = column.push(browser_view);
         }
