@@ -8,58 +8,32 @@ use iced::advanced::{
 };
 use iced::event::Status;
 use iced::widget::image::{Handle, Image};
-use iced::{theme::Theme, Element, Event, Length, Point, Rectangle, Size};
+use iced::{theme::Theme, Element, Event, Length, Rectangle, Size};
 
+use super::Message;
 use crate::ImageInfo;
 
-pub fn browser_view<Message>(
-    bounds: Size<u32>,
-    image: &ImageInfo,
-    send_bounds: Box<dyn Fn(Size<u32>) -> Message>,
-    keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
-    mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
-    can_type: bool,
-) -> BrowserView<Message> {
-    BrowserView::new(
-        bounds,
-        image,
-        send_bounds,
-        keyboard_event,
-        mouse_event,
-        can_type,
-    )
+pub fn browser_view(bounds: Size<u32>, image: &ImageInfo, can_type: bool) -> BrowserView {
+    BrowserView::new(bounds, image, can_type)
 }
 
-pub struct BrowserView<Message> {
+pub struct BrowserView {
     bounds: Size<u32>,
     image: Image<Handle>,
-    send_bounds: Box<dyn Fn(Size<u32>) -> Message>,
-    keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
-    mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
     can_interact: bool, // wheather or not to allow typing - useful when overlay enabled
 }
 
-impl<Message> BrowserView<Message> {
-    pub fn new(
-        bounds: Size<u32>,
-        image: &ImageInfo,
-        send_bounds: Box<dyn Fn(Size<u32>) -> Message>,
-        keyboard_event: Box<dyn Fn(iced::keyboard::Event) -> Message>,
-        mouse_event: Box<dyn Fn(Point, iced::mouse::Event) -> Message>,
-        can_type: bool,
-    ) -> Self {
+impl BrowserView {
+    pub fn new(bounds: Size<u32>, image: &ImageInfo, can_type: bool) -> Self {
         Self {
             bounds,
             image: image.as_image(),
-            send_bounds,
-            keyboard_event,
-            mouse_event,
             can_interact: can_type,
         }
     }
 }
 
-impl<Message, Renderer> Widget<Message, Theme, Renderer> for BrowserView<Message>
+impl<Renderer> Widget<Message, Theme, Renderer> for BrowserView
 where
     Renderer: iced::advanced::image::Renderer<Handle = iced::advanced::image::Handle>,
 {
@@ -117,16 +91,16 @@ where
             // convert to u32 because Image takes u32
             let size = Size::new(layout.bounds().width as u32, layout.bounds().height as u32);
             if self.bounds != size {
-                shell.publish((self.send_bounds)(size));
+                shell.publish(Message::UpdateViewSize(size));
             }
 
             match event {
                 Event::Keyboard(event) => {
-                    shell.publish((self.keyboard_event)(event));
+                    shell.publish(Message::SendKeyboardEvent(event));
                 }
                 Event::Mouse(event) => {
                     if let Some(point) = cursor.position_in(layout.bounds()) {
-                        shell.publish((self.mouse_event)(point, event));
+                        shell.publish(Message::SendMouseEvent(point, event));
                     }
                 }
                 _ => (),
@@ -136,11 +110,12 @@ where
     }
 }
 
-impl<'a, Message: 'a, Renderer> From<BrowserView<Message>> for Element<'a, Message, Theme, Renderer>
+impl<'a, Message: 'a, Renderer> From<BrowserView> for Element<'a, Message, Theme, Renderer>
 where
     Renderer: advanced::Renderer + advanced::image::Renderer<Handle = advanced::image::Handle>,
+    BrowserView: Widget<Message, Theme, Renderer>,
 {
-    fn from(widget: BrowserView<Message>) -> Self {
+    fn from(widget: BrowserView) -> Self {
         Self::new(widget)
     }
 }

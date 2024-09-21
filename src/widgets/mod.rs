@@ -377,9 +377,6 @@ where
         let browser_view = browser_view(
             self.view_size,
             self.engine().get_tabs().get_current().get_view(),
-            Box::new(Message::UpdateViewSize),
-            Box::new(Message::SendKeyboardEvent),
-            Box::new(Message::SendMouseEvent),
             !self.show_overlay,
         );
         if self.show_overlay {
