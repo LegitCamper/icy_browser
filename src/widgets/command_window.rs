@@ -1,5 +1,5 @@
 use iced::widget::{center, column, container, mouse_area, opaque, stack, text_input};
-use iced::{border, Color, Element, Font, Length, Theme};
+use iced::{border, Color, Element, Length, Theme};
 use iced_aw::SelectionList;
 use strum::IntoEnumIterator;
 
