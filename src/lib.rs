@@ -15,6 +15,9 @@ pub use widgets::{nav_bar, tab_bar, BrowserWidget, Message};
 mod shortcut;
 pub use shortcut::{KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts};
 
+#[cfg(feature = "ultralight")]
+pub type Browser = BrowserWidget<Ultralight>;
+
 // Helper function to ensure required icons are imported
 pub fn get_fonts() -> Vec<Cow<'static, [u8]>> {
     vec![BOOTSTRAP_FONT_BYTES.into()]

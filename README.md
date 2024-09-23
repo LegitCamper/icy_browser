@@ -26,57 +26,29 @@
 <img src="https://github.com/LegitCamper/rust-browser/blob/main/assets/basic_browser.png" width=50%>
 
 ``` Rust
-use iced::{Element, Settings, Theme};
-use iced_aw::BOOTSTRAP_FONT_BYTES;
+use iced::{Settings, Task, Theme};
+use icy_browser::{get_fonts, Browser, Message};
 
-use icy_browser::{widgets, BrowserWidget, Ultralight};
+fn run() -> (Browser, Task<Message>) {
+    (
+        Browser::new_with_ultralight()
+            .with_tab_bar()
+            .with_nav_bar()
+            .build(),
+        Task::none(),
+    )
+}
 
 fn main() -> iced::Result {
-    // This imports `icons` for widgets
-    let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
     let settings = Settings {
-        fonts: vec![bootstrap_font],
+        fonts: get_fonts(),
         ..Default::default()
     };
 
-    iced::application("Basic Browser Example", Browser::update, Browser::view)
+    iced::application("Basic Browser", Browser::update, Browser::view)
+        .subscription(Browser::subscription)
         .settings(settings)
         .theme(|_| Theme::Dark)
-        .run()
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    BrowserWidget(widgets::Message),
-}
-
-struct Browser {
-    widgets: BrowserWidget<Ultralight>,
-}
-
-impl Browser {
-    fn update(&mut self, message: Message) {
-        match message {
-            Message::BrowserWidget(msg) => {
-                self.widgets.update(msg);
-            }
-        }
-    }
-
-    fn view(&self) -> Element<Message> {
-        self.widgets.view().map(Message::BrowserWidget)
-    }
-}
-
-impl Default for Browser {
-    fn default() -> Self {
-        let widgets = BrowserWidget::new_with_ultralight()
-            .with_tab_bar()
-            .with_nav_bar()
-            .with_browsesr_view()
-            .build();
-
-        Self { widgets }
-    }
+        .run_with(run)
 }
 ```

@@ -22,9 +22,6 @@ incremental = true
 opt-level = "s"
 lto = "thin"
 
-[build]
-rustflags = ["-Z", "threads=8"]
-
 [features]
 default = ["webkit"]
 webkit = ["ultralight"]

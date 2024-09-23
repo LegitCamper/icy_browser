@@ -17,8 +17,6 @@ fn main() {
         .parent()
         .unwrap();
 
-    println!("cargo:warning={:?}", path.as_os_str());
-
     // ensure runtime resources exist
     #[cfg(feature = "ultralight")]
     {
