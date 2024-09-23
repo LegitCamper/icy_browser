@@ -3,19 +3,16 @@
 use iced::event::{self, Event};
 use iced::Theme;
 use iced::{Element, Settings, Subscription, Task};
-use iced_aw::BOOTSTRAP_FONT_BYTES;
 use std::time::Duration;
 
 use icy_browser::{
-    widgets, BrowserWidget, KeyType, Message as WidgetMessage, ShortcutBuilder, ShortcutModifier,
-    Ultralight,
+    get_fonts, widgets, BrowserWidget, KeyType, Message as WidgetMessage, ShortcutBuilder,
+    ShortcutModifier, Ultralight,
 };
 
 fn main() -> iced::Result {
-    // This imports `icons` for widgets
-    let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
     let settings = Settings {
-        fonts: vec![bootstrap_font],
+        fonts: get_fonts(),
         ..Default::default()
     };
 

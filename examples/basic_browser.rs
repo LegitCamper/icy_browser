@@ -2,16 +2,13 @@
 
 use iced::Theme;
 use iced::{Element, Settings, Subscription, Task};
-use iced_aw::BOOTSTRAP_FONT_BYTES;
 use std::time::Duration;
 
-use icy_browser::{widgets, BrowserWidget, Ultralight};
+use icy_browser::{get_fonts, widgets, BrowserWidget, Ultralight};
 
 fn main() -> iced::Result {
-    // This imports `icons` for widgets
-    let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
     let settings = Settings {
-        fonts: vec![bootstrap_font],
+        fonts: get_fonts(),
         ..Default::default()
     };
 

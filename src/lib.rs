@@ -1,4 +1,6 @@
 use iced::widget::image::{Handle, Image};
+pub use iced_fonts::BOOTSTRAP_FONT_BYTES;
+use std::borrow::Cow;
 use url::{ParseError, Url};
 
 mod engines;
@@ -12,6 +14,11 @@ pub use widgets::{nav_bar, tab_bar, BrowserWidget, Message};
 
 mod shortcut;
 pub use shortcut::{KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts};
+
+// Helper function to ensure required icons are imported
+pub fn get_fonts() -> Vec<Cow<'static, [u8]>> {
+    vec![BOOTSTRAP_FONT_BYTES.into()]
+}
 
 // Image details for passing the view around
 #[derive(Debug, Clone)]
