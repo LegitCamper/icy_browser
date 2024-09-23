@@ -24,7 +24,7 @@ impl ShortcutBuilder {
                 }
                 unreachable!()
             })
-            .filter(|item| *item == true)
+            .filter(|item| *item) // if item == true
             .count()
             != 1
         {
@@ -42,7 +42,7 @@ impl ShortcutBuilder {
                 }
                 unreachable!()
             })
-            .filter(|item| *item == true)
+            .filter(|item| *item) // if itme == true
             .count()
             < 1
         {
@@ -55,6 +55,12 @@ impl ShortcutBuilder {
 
     pub fn build(self) -> Shortcuts {
         self.0
+    }
+}
+
+impl Default for ShortcutBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -98,5 +104,5 @@ pub fn check_shortcut(shortcut: &Shortcut, key: &Key, modifiers: &Modifiers) -> 
                 ShortcutModifier::Alt => modifiers.alt(),
             },
         })
-        .all(|s| s == true)
+        .all(|s| s) // if s == true
 }

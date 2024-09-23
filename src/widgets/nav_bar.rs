@@ -6,9 +6,16 @@ use super::Message;
 
 /// Holds the state of infomation in nav_bar
 pub struct NavBarState(pub String);
+
 impl NavBarState {
     pub fn new() -> Self {
         NavBarState(String::new())
+    }
+}
+
+impl Default for NavBarState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

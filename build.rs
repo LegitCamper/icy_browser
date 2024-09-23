@@ -31,7 +31,7 @@ fn main() {
             panic!("Could not find either debug or release dirs")
         }
 
-        assert!(possible_directories.len() >= 1);
+        assert!(!possible_directories.is_empty());
 
         let local_resources = Path::new(PATH).join("resources");
 

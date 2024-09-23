@@ -23,6 +23,12 @@ impl CommandWindowState {
     }
 }
 
+impl Default for CommandWindowState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub fn command_window<'a>(
     base: impl Into<Element<'a, Message>>,
     state: &'a CommandWindowState,
@@ -33,7 +39,7 @@ pub fn command_window<'a>(
             .width(Length::Fill)
             .height(Length::Fill)
             .style(|theme: &Theme, _| iced_aw::style::selection_list::Style {
-                text_color: theme.palette().text.into(),
+                text_color: theme.palette().text,
                 background: theme.palette().background.into(),
                 ..Default::default()
             }),
