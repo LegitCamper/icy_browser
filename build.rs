@@ -75,7 +75,7 @@ fn main() {
 }
 
 fn copy_file(from: &Path, to: &Path, file_name: &str) -> Result<u64, std::io::Error> {
-    fs::copy(&from.join(file_name), to.join(file_name))
+    fs::copy(from.join(file_name), to.join(file_name))
 }
 
 fn get_paths(possible_paths: &mut Vec<fs::DirEntry>, path_str: String) {
