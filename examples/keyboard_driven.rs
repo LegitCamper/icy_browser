@@ -1,11 +1,15 @@
-// Simple browser with familiar browser widget and the ultralight(webkit) webengine as a backend
+// Simple keybaord driven browser using the ultralight(webkit) webengine as a backend
 
+use iced::event::{self, Event};
 use iced::Theme;
 use iced::{Element, Settings, Subscription, Task};
 use iced_aw::BOOTSTRAP_FONT_BYTES;
 use std::time::Duration;
 
-use icy_browser::{widgets, BrowserWidget, Ultralight};
+use icy_browser::{
+    widgets, BrowserWidget, KeyType, Message as WidgetMessage, ShortcutBuilder, ShortcutModifier,
+    Ultralight,
+};
 
 fn main() -> iced::Result {
     // This imports `icons` for widgets
@@ -15,7 +19,7 @@ fn main() -> iced::Result {
         ..Default::default()
     };
 
-    iced::application("Basic Browser Example", Browser::update, Browser::view)
+    iced::application("Keyboard Driven Browser", Browser::update, Browser::view)
         .subscription(Browser::subscription)
         .settings(settings)
         .theme(|_| Theme::Dark)
@@ -26,6 +30,7 @@ fn main() -> iced::Result {
 pub enum Message {
     BrowserWidget(widgets::Message), // Passes messagees to Browser widgets
     Update,
+    Event(Event),
 }
 
 struct Browser {
@@ -34,8 +39,17 @@ struct Browser {
 
 impl Default for Browser {
     fn default() -> Self {
-        // Customize the look and feel of the browser here
+        let shortcuts = ShortcutBuilder::new()
+            .add_shortcut(
+                WidgetMessage::ToggleOverlay,
+                vec![
+                    KeyType::Modifier(ShortcutModifier::Ctrl),
+                    KeyType::Key(iced::keyboard::Key::Character("e".into())),
+                ],
+            )
+            .build();
         let widgets = BrowserWidget::new_with_ultralight()
+            .with_custom_shortcuts(shortcuts)
             .with_tab_bar()
             .with_nav_bar()
             .build();
@@ -49,6 +63,10 @@ impl Browser {
         match message {
             Message::BrowserWidget(msg) => self.widgets.update(msg).map(Message::BrowserWidget),
             Message::Update => self.widgets.force_update().map(Message::BrowserWidget),
+            Message::Event(event) => self
+                .widgets
+                .update(widgets::Message::Event(Some(event)))
+                .map(Message::BrowserWidget),
         }
     }
 
@@ -57,6 +75,10 @@ impl Browser {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced::time::every(Duration::from_millis(10)).map(move |_| Message::Update)
+        Subscription::batch([
+            iced::time::every(Duration::from_millis(10)).map(move |_| Message::Update),
+            // This is needed for child widgets such as overlay to detect Key events
+            event::listen().map(Message::Event),
+        ])
     }
 }

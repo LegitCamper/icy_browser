@@ -8,7 +8,10 @@ pub use engines::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 pub use engines::ultralight::Ultralight;
 
 pub mod widgets;
-pub use widgets::{nav_bar, tab_bar, BrowserWidget};
+pub use widgets::{nav_bar, tab_bar, BrowserWidget, Message};
+
+mod shortcut;
+pub use shortcut::{KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts};
 
 // Image details for passing the view around
 #[derive(Debug, Clone)]
@@ -33,7 +36,7 @@ impl ImageInfo {
     const WIDTH: u32 = 800;
     const HEIGHT: u32 = 800;
 
-    fn new(pixels: Vec<u8>, format: PixelFormat, width: u32, height: u32) -> Self {
+    pub fn new(pixels: Vec<u8>, format: PixelFormat, width: u32, height: u32) -> Self {
         // R, G, B, A
         assert_eq!(pixels.len() % 4, 0);
 

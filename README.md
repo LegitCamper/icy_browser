@@ -4,7 +4,7 @@
 <img src="https://raw.githubusercontent.com/gist/hecrj/ad7ecd38f6e47ff3688a38c79fd108f0/raw/74384875ecbad02ae2a926425e9bcafd0695bade/color.svg" width=8%>
 
 ### Supported Platforms
-| Platform | Support |
+| Platform | Support               |
 | Windows  | <span>&#10003;</span> |
 | Linux    | <span>&#10003;</span> |
 

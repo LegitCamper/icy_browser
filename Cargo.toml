@@ -2,7 +2,7 @@
 name = "icy_browser"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.79.0"
+rust-version = "1.81.0"
 description = "iced browser widgets"
 repository = "https://github.com/LegitCamper/rust-browser"
 
@@ -33,13 +33,19 @@ ultralight = ["ul-next"]
 [dependencies]
 env_home = "0.1.0"
 iced = { version = "0.13", features = ["advanced", "image", "tokio", "lazy"] }
-iced_aw = { version = "0.10", features = ["tab_bar", "icons"] }
+iced_aw = { version = "0.10", features = [
+  "tab_bar",
+  "icons",
+  "selection_list",
+] }
 iced_on_focus_widget = "0.1.1"
 rand = "0.8.5"
 reqwest = "0.12.5"
 serde = "1.0.207"
 serde_json = "1.0.124"
 smol_str = "0.2.2"
+strum = { version = "0.26.3", features = ["derive"] }
+strum_macros = "0.26.4"
 tempfile = "3.12.0"
 ul-next = { version = "0.4", optional = true }
 url = "2.5.2"
