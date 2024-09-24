@@ -6,8 +6,8 @@ use iced::{Element, Settings, Subscription, Task};
 use std::time::Duration;
 
 use icy_browser::{
-    get_fonts, widgets, BrowserWidget, KeyType, Message as WidgetMessage, ShortcutBuilder,
-    ShortcutModifier, Ultralight,
+    get_fonts, widgets, BasicBrowser, BrowserWidget, KeyType, Message as WidgetMessage,
+    ShortcutBuilder, ShortcutModifier,
 };
 
 fn main() -> iced::Result {
@@ -15,6 +15,8 @@ fn main() -> iced::Result {
         fonts: get_fonts(),
         ..Default::default()
     };
+
+    println!("Press Crtl - E to open to Command palatte");
 
     iced::application("Keyboard Driven Browser", Browser::update, Browser::view)
         .subscription(Browser::subscription)
@@ -31,7 +33,7 @@ pub enum Message {
 }
 
 struct Browser {
-    widgets: BrowserWidget<Ultralight>,
+    widgets: BasicBrowser,
 }
 
 impl Default for Browser {
@@ -45,10 +47,9 @@ impl Default for Browser {
                 ],
             )
             .build();
-        let widgets = BrowserWidget::new_with_ultralight()
+        let widgets = BrowserWidget::new_basic()
             .with_custom_shortcuts(shortcuts)
             .with_tab_bar()
-            .with_nav_bar()
             .build();
 
         Self { widgets }

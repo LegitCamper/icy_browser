@@ -1,5 +1,6 @@
 use iced::widget::image::{Handle, Image};
 pub use iced_fonts::BOOTSTRAP_FONT_BYTES;
+pub use iced_on_focus_widget::hoverable;
 use std::borrow::Cow;
 use url::{ParseError, Url};
 
@@ -10,13 +11,17 @@ pub use engines::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 pub use engines::ultralight::Ultralight;
 
 pub mod widgets;
-pub use widgets::{nav_bar, tab_bar, BrowserWidget, Message};
+pub use widgets::{browser_view, command_window, nav_bar, tab_bar, BrowserWidget, Message};
 
 mod shortcut;
 pub use shortcut::{KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts};
 
+// Used when Not using custom views
+#[derive(Clone)]
+pub struct NoCustomView;
+
 #[cfg(feature = "ultralight")]
-pub type Browser = BrowserWidget<Ultralight>;
+pub type BasicBrowser = BrowserWidget<Ultralight, NoCustomView>;
 
 // Helper function to ensure required icons are imported
 pub fn get_fonts() -> Vec<Cow<'static, [u8]>> {

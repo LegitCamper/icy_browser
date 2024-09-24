@@ -1,11 +1,11 @@
 // Simple browser with familiar browser widgets and the ultralight(webkit) webengine as a backend
 
 use iced::{Settings, Task, Theme};
-use icy_browser::{get_fonts, Browser, Message};
+use icy_browser::{get_fonts, BasicBrowser, Message};
 
-fn run() -> (Browser, Task<Message>) {
+fn run() -> (BasicBrowser, Task<Message>) {
     (
-        Browser::new_with_ultralight()
+        BasicBrowser::new_basic()
             .with_tab_bar()
             .with_nav_bar()
             .build(),
@@ -19,8 +19,8 @@ fn main() -> iced::Result {
         ..Default::default()
     };
 
-    iced::application("Basic Browser", Browser::update, Browser::view)
-        .subscription(Browser::subscription)
+    iced::application("Basic Browser", BasicBrowser::update, BasicBrowser::view)
+        .subscription(BasicBrowser::subscription)
         .settings(settings)
         .theme(|_| Theme::Dark)
         .run_with(run)

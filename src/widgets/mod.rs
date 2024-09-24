@@ -1,10 +1,12 @@
 use command_window::CommandWindowState;
+use iced::event::{self, Event};
 use iced::keyboard::{self, key};
 use iced::widget::{self, column};
-use iced::{event::Event, mouse, Element, Point, Size, Task};
+use iced::{mouse, Element, Point, Size, Subscription, Task};
 use iced_on_focus_widget::hoverable;
 use nav_bar::NavBarState;
 use std::string::ToString;
+use std::time::Duration;
 use strum_macros::{Display, EnumIter};
 use url::Url;
 
@@ -51,6 +53,7 @@ pub enum Message {
     HideOverlay,
 
     // Internal only - for widgets
+    Update,
     UrlChanged(String),
     UpdateUrl,
     QueryChanged(String),
@@ -73,19 +76,33 @@ impl Default for TabSelectionType {
     }
 }
 
-pub struct BrowserWidget<Engine: BrowserEngine> {
-    engine: Option<Engine>,
-    home: Url,
-    nav_bar_state: NavBarState,
-    command_window_state: CommandWindowState,
-    with_tab_bar: bool,
-    with_nav_bar: bool,
-    show_overlay: bool,
-    shortcuts: Shortcuts,
-    view_size: Size<u32>,
+/// Allows users to create their own views with the same information of native widgets
+pub type CustomView<Engine, CustomViewState> = fn(
+    &BrowserWidget<Engine, CustomViewState>,
+    custom_view_state: CustomViewState,
+) -> Element<Message>;
+
+/// Allows users to create their own updates with the same information of native widgets
+pub type CustomUpdate<'a, Engine, CustomViewState> = fn(
+    &BrowserWidget<Engine, CustomViewState>,
+    custom_view_state: &mut CustomViewState,
+) -> Element<'a, Message>;
+
+pub struct BrowserWidget<Engine: BrowserEngine, CustomViewState: Clone> {
+    pub engine: Option<Engine>,
+    pub home: Url,
+    pub nav_bar_state: NavBarState,
+    pub command_window_state: CommandWindowState,
+    custom_view: Option<CustomView<Engine, CustomViewState>>,
+    custom_view_state: Option<CustomViewState>,
+    pub with_tab_bar: bool,
+    pub with_nav_bar: bool,
+    pub show_overlay: bool,
+    pub shortcuts: Shortcuts,
+    pub view_size: Size<u32>,
 }
 
-impl<Engine> Default for BrowserWidget<Engine>
+impl<Engine, CustomViewState: Clone> Default for BrowserWidget<Engine, CustomViewState>
 where
     Engine: BrowserEngine,
 {
@@ -96,6 +113,8 @@ where
             home,
             nav_bar_state: NavBarState::new(),
             command_window_state: CommandWindowState::new(),
+            custom_view: None,
+            custom_view_state: None,
             with_tab_bar: false,
             with_nav_bar: false,
             show_overlay: false,
@@ -109,8 +128,8 @@ where
 use crate::engines::ultralight::Ultralight;
 
 #[cfg(feature = "ultralight")]
-impl BrowserWidget<Ultralight> {
-    pub fn new_with_ultralight() -> BrowserWidget<Ultralight> {
+impl<'a, CustomViewState: Clone> BrowserWidget<Ultralight, CustomViewState> {
+    pub fn new_basic() -> BrowserWidget<Ultralight, CustomViewState> {
         BrowserWidget {
             engine: Some(Ultralight::new()),
             ..BrowserWidget::default()
@@ -118,7 +137,7 @@ impl BrowserWidget<Ultralight> {
     }
 }
 
-impl<Engine> BrowserWidget<Engine>
+impl<Engine, CustomViewState: Clone> BrowserWidget<Engine, CustomViewState>
 where
     Engine: BrowserEngine,
 {
@@ -151,6 +170,16 @@ where
         self
     }
 
+    pub fn with_custom_view(
+        mut self,
+        custom_view: CustomView<Engine, CustomViewState>,
+        custom_view_state: CustomViewState,
+    ) -> Self {
+        self.custom_view = Some(custom_view);
+        self.custom_view_state = Some(custom_view_state);
+        self
+    }
+
     pub fn build(self) -> Self {
         assert!(self.engine.is_some());
 
@@ -159,7 +188,7 @@ where
         build
     }
 
-    fn engine(&self) -> &Engine {
+    pub fn engine(&self) -> &Engine {
         self.engine
             .as_ref()
             .expect("Browser was created without a backend engine!")
@@ -220,6 +249,7 @@ where
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         let task = match message {
+            Message::Update => self.force_update(),
             Message::UpdateViewSize(size) => {
                 self.view_size = size;
                 self.engine_mut().resize(size);
@@ -373,27 +403,49 @@ where
     }
 
     pub fn view(&self) -> Element<Message> {
-        let mut column = column![];
+        match self.custom_view {
+            Some(custom_view) => {
+                if let Some(state) = &self.custom_view_state {
+                    custom_view(self, state.clone())
+                } else {
+                    panic!(
+                    "If Custom View is set, Custom View State must be set too. Use () if unused",
+                    )
+                }
+            }
+            None => {
+                let mut column = column![];
 
-        if self.with_tab_bar {
-            column = column.push(tab_bar(self.engine().get_tabs()))
-        }
-        if self.with_nav_bar {
-            column = column
-                .push(hoverable(nav_bar(&self.nav_bar_state)).on_focus_change(Message::UpdateUrl))
-        }
+                if self.with_tab_bar {
+                    column = column.push(tab_bar(self.engine().get_tabs()))
+                }
+                if self.with_nav_bar {
+                    column = column.push(
+                        hoverable(nav_bar(&self.nav_bar_state)).on_focus_change(Message::UpdateUrl),
+                    )
+                }
 
-        let browser_view = browser_view(
-            self.view_size,
-            self.engine().get_tabs().get_current().get_view(),
-            !self.show_overlay,
-        );
-        if self.show_overlay {
-            column = column.push(command_window(browser_view, &self.command_window_state))
-        } else {
-            column = column.push(browser_view);
-        }
+                let browser_view = browser_view(
+                    self.view_size,
+                    self.engine().get_tabs().get_current().get_view(),
+                    !self.show_overlay,
+                );
+                if self.show_overlay {
+                    column = column.push(command_window(browser_view, &self.command_window_state))
+                } else {
+                    column = column.push(browser_view);
+                }
 
-        column.into()
+                column.into()
+            }
+        }
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        Subscription::batch([
+            iced::time::every(Duration::from_millis(10)).map(move |_| Message::Update),
+            // This is needed for child widgets such as overlay to detect Key events
+            event::listen().map(|e: Event| Message::Event(Some(e))),
+        ])
     }
 }
