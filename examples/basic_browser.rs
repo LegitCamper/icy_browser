@@ -1,13 +1,17 @@
 // Simple browser with familiar browser widgets and the ultralight(webkit) webengine as a backend
 
 use iced::{Settings, Task, Theme};
-use icy_browser::{get_fonts, BasicBrowser, Message};
+use icy_browser::{get_fonts, BasicBrowser, Bookmark, Message};
 
 fn run() -> (BasicBrowser, Task<Message>) {
     (
         BasicBrowser::new_basic()
             .with_tab_bar()
             .with_nav_bar()
+            .with_bookmark_bar(vec![Bookmark::new(
+                "https://www.rust-lang.org",
+                "rust-lang.org",
+            )])
             .build(),
         Task::none(),
     )

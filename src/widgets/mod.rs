@@ -19,9 +19,13 @@ pub use nav_bar::nav_bar;
 mod tab_bar;
 pub use tab_bar::tab_bar;
 
+mod bookmark_bar;
+pub use bookmark_bar::bookmark_bar;
+
 mod command_window;
 pub use command_window::command_window;
 
+use crate::Bookmark;
 use crate::{engines::BrowserEngine, shortcut::check_shortcut, to_url, ImageInfo, Shortcuts};
 
 // Options exist only to have defaults for EnumIter
@@ -58,6 +62,7 @@ pub enum Message {
     UpdateUrl,
     QueryChanged(String),
     CommandSelectionChanged(usize, String),
+    CommandSelectionSelected,
     SendKeyboardEvent(Option<keyboard::Event>),
     SendMouseEvent(Point, Option<mouse::Event>),
     UpdateViewSize(Size<u32>),
@@ -97,6 +102,7 @@ pub struct BrowserWidget<Engine: BrowserEngine, CustomViewState: Clone> {
     custom_view_state: Option<CustomViewState>,
     pub with_tab_bar: bool,
     pub with_nav_bar: bool,
+    pub bookmarks: Option<Vec<Bookmark>>,
     pub show_overlay: bool,
     pub shortcuts: Shortcuts,
     pub view_size: Size<u32>,
@@ -117,6 +123,7 @@ where
             custom_view_state: None,
             with_tab_bar: false,
             with_nav_bar: false,
+            bookmarks: None,
             show_overlay: false,
             shortcuts: Shortcuts::default(),
             view_size: Size::new(800, 800),
@@ -162,6 +169,11 @@ where
 
     pub fn with_nav_bar(mut self) -> Self {
         self.with_nav_bar = true;
+        self
+    }
+
+    pub fn with_bookmark_bar(mut self, bookmarks: Vec<Bookmark>) -> Self {
+        self.bookmarks = Some(bookmarks);
         self
     }
 
@@ -349,6 +361,9 @@ where
                 self.command_window_state.selected_action = name;
                 Task::none()
             }
+            Message::CommandSelectionSelected => {
+                unimplemented!()
+            }
             Message::ToggleOverlay => {
                 if self.show_overlay {
                     Task::done(Message::HideOverlay)
@@ -377,9 +392,15 @@ where
                         } = key
                         {
                             // Default behaviors
-                            if key == keyboard::Key::Named(key::Named::Escape) && self.show_overlay
+                            // escape to exit command palatte
+                            if self.show_overlay && key == keyboard::Key::Named(key::Named::Escape)
                             {
                                 return Task::done(Message::HideOverlay);
+                            }
+                            // ctrl + R = refresh
+                            else if modifiers.control() && key == key::Key::Character("r".into())
+                            {
+                                return Task::done(Message::Refresh);
                             }
 
                             // Shortcut (Customizable) behaviors
@@ -423,6 +444,9 @@ where
                     column = column.push(
                         hoverable(nav_bar(&self.nav_bar_state)).on_focus_change(Message::UpdateUrl),
                     )
+                }
+                if let Some(bookmarks) = self.bookmarks.as_ref() {
+                    column = column.push(bookmark_bar(bookmarks))
                 }
 
                 let browser_view = browser_view(

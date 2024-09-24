@@ -6,7 +6,7 @@ use iced_aw::{TabBar as TB, TabLabel};
 use super::{Message, TabSelectionType};
 use crate::engines::{TabInfo, Tabs};
 
-// helper function to create navigation bar
+/// Creates Tab bar widget
 pub fn tab_bar<Info: TabInfo>(tabs: &Tabs<Info>) -> Element<Message> {
     let current_id = tabs.get_current_id();
     let active_tab = tabs

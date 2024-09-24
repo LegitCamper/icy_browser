@@ -1,7 +1,11 @@
-use iced::widget::image::{Handle, Image};
+use iced::widget::{
+    button,
+    image::{Handle, Image},
+    Button,
+};
 pub use iced_fonts::BOOTSTRAP_FONT_BYTES;
 pub use iced_on_focus_widget::hoverable;
-use std::borrow::Cow;
+use std::{borrow::Cow, str::FromStr};
 use url::{ParseError, Url};
 
 mod engines;
@@ -91,5 +95,23 @@ fn to_url(url: &str) -> Option<Url> {
                 None
             }
         }
+    }
+}
+
+pub struct Bookmark {
+    url: Url,
+    name: String,
+    // icon: Optional<>
+}
+impl Bookmark {
+    pub fn new(url: &str, name: &str) -> Self {
+        Bookmark {
+            url: Url::from_str(url).expect("Failed to parse url from bookmark url"),
+            name: name.to_string(),
+        }
+    }
+
+    pub fn as_button(&self) -> Button<Message> {
+        button(self.name.as_str()).on_press(Message::GoToUrl(self.url.to_string()))
     }
 }

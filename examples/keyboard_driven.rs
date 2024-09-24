@@ -6,7 +6,7 @@ use iced::{Element, Settings, Subscription, Task};
 use std::time::Duration;
 
 use icy_browser::{
-    get_fonts, widgets, BasicBrowser, BrowserWidget, KeyType, Message as WidgetMessage,
+    get_fonts, widgets, BasicBrowser, Bookmark, BrowserWidget, KeyType, Message as WidgetMessage,
     ShortcutBuilder, ShortcutModifier,
 };
 
@@ -16,7 +16,7 @@ fn main() -> iced::Result {
         ..Default::default()
     };
 
-    println!("Press Crtl - E to open to Command palatte");
+    println!("Press 'Crtl + E' to open to Command palatte");
 
     iced::application("Keyboard Driven Browser", Browser::update, Browser::view)
         .subscription(Browser::subscription)
@@ -50,6 +50,14 @@ impl Default for Browser {
         let widgets = BrowserWidget::new_basic()
             .with_custom_shortcuts(shortcuts)
             .with_tab_bar()
+            .with_bookmark_bar(vec![
+                Bookmark::new("https://www.rust-lang.org", "rust-lang.org"),
+                Bookmark::new(
+                    "https://github.com/LegitCamper/icy_browser",
+                    "icy_browser github",
+                ),
+                Bookmark::new("https://docs.rs/iced/latest/iced/", "iced docs"),
+            ])
             .build();
 
         Self { widgets }

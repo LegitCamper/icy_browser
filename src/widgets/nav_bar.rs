@@ -19,6 +19,7 @@ impl Default for NavBarState {
     }
 }
 
+/// Creates Navigation bar widget
 pub fn nav_bar(state: &NavBarState) -> Element<Message> {
     let back = tooltip_helper(
         Button::new(icon_to_text(Bootstrap::ChevronBarLeft))
