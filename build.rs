@@ -3,23 +3,24 @@ use std::fs::{self, DirEntry};
 use std::path::Path;
 
 fn main() {
-    let out = var("OUT_DIR").unwrap();
-    // This allows it to work in this project but also other projects too
-    let path = Path::new(&out)
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap()
-        .parent()
-        .unwrap();
-
     // ensure runtime resources exist
     #[cfg(feature = "ultralight")]
+    #[cfg(not(feature = "cross"))]
     {
+        let out = var("OUT_DIR").unwrap();
+        // This allows it to work in this project but also other projects too
+        let path = Path::new(&out)
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+
         let mut possible_directories = Vec::new();
 
         let target = Path::new(path).join("target");
@@ -73,7 +74,6 @@ fn main() {
         }
     }
 
-    println!("cargo:rerun-if-changed=targets");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=Cargo.lock");
 }

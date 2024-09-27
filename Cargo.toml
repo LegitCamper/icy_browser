@@ -28,6 +28,8 @@ webkit = ["ultralight"]
 ultralight = ["ul-next"]
 native-tls = ["reqwest/native-tls"]
 rustls-tls = ["reqwest/rustls-tls"]
+# exists to prevent build.rs from failing build
+cross = []
 
 [dependencies]
 env_home = "0.1.0"
