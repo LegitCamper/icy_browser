@@ -23,9 +23,11 @@ opt-level = "s"
 lto = "thin"
 
 [features]
-default = ["webkit"]
+default = ["webkit", "native-tls"]
 webkit = ["ultralight"]
 ultralight = ["ul-next"]
+native-tls = ["reqwest/native-tls"]
+rustls-tls = ["reqwest/rustls-tls"]
 
 [dependencies]
 env_home = "0.1.0"
