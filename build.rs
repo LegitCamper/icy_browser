@@ -5,7 +5,7 @@ use std::path::Path;
 fn main() {
     // ensure runtime resources exist
     #[cfg(feature = "ultralight")]
-    #[cfg(not(feature = "cross"))]
+    #[cfg(not(feature = "ci"))]
     {
         let out = var("OUT_DIR").unwrap();
         // This allows it to work in this project but also other projects too
