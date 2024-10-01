@@ -23,13 +23,12 @@ opt-level = "s"
 lto = "thin"
 
 [features]
-default = ["webkit", "native-tls"]
+default = ["webkit", "native-tls", "ultralight-resources"]
 webkit = ["ultralight"]
 ultralight = ["ul-next"]
+ultralight-resources = []
 native-tls = ["reqwest/native-tls"]
 rustls-tls = ["reqwest/rustls-tls"]
-# exists to prevent build.rs from failing build in ci/cd
-ci = []
 
 [dependencies]
 iced = { version = "0.13", features = ["advanced", "image", "tokio", "lazy"] }

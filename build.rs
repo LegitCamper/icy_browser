@@ -4,8 +4,7 @@ use std::path::Path;
 
 fn main() {
     // ensure runtime resources exist
-    #[cfg(feature = "ultralight")]
-    #[cfg(not(feature = "ci"))]
+    #[cfg(feature = "ultralight-resources")]
     {
         let out = var("OUT_DIR").unwrap();
         // This allows it to work in this project but also other projects too
@@ -74,6 +73,7 @@ fn main() {
         }
     }
 
+    println!("cargo:rerun-if-changed=target");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=Cargo.lock");
 }
