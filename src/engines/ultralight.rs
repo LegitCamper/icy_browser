@@ -15,9 +15,6 @@ use ul_next::{
 };
 use url::Url;
 
-#[cfg(not(debug_assertions))]
-use env_home::env_home_dir;
-
 use super::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 
 struct UlLogger;
@@ -61,26 +58,9 @@ impl Ultralight {
     pub fn new() -> Self {
         let config = Config::start().build().unwrap();
         platform::enable_platform_fontloader();
-
-        #[cfg(not(debug_assertions))]
-        let mut home_dir = env_home_dir().unwrap();
-        #[cfg(not(debug_assertions))]
-        home_dir.push(".icy_browser");
-        #[cfg(not(debug_assertions))]
-        platform::enable_platform_filesystem(home_dir.as_path()).unwrap();
-
-        #[cfg(debug_assertions)]
         platform::enable_platform_filesystem(".").unwrap();
-
         platform::set_logger(UlLogger);
-
-        #[cfg(not(debug_assertions))]
-        home_dir.push("logs.txt");
-        #[cfg(not(debug_assertions))]
-        platform::enable_default_logger(home_dir.as_path()).unwrap();
-
-        #[cfg(debug_assertions)]
-        platform::enable_default_logger("./logs.txt").unwrap();
+        platform::enable_default_logger("./log.txt").unwrap();
 
         let renderer = Renderer::create(config).unwrap();
         let view_config = ViewConfig::start()
