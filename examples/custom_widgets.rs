@@ -85,13 +85,6 @@ impl Browser {
     }
 }
 
-// fn custom_update<'a, Engine: BrowserEngine, CustomViewState>(
-//     browser_widget: &'a BrowserWidget<Engine, CustomWidgetState>,
-//     custom_view_state: &'a mut CustomViewState,
-// ) -> Element<'a, icy_browser::Message> {
-
-// }
-
 fn custom_view<Engine: BrowserEngine>(
     browser_widget: &BrowserWidget<Engine, CustomWidgetState>,
     widget_state: CustomWidgetState,
