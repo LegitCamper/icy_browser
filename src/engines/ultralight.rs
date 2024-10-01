@@ -17,13 +17,6 @@ use url::Url;
 
 use super::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 
-struct UlLogger;
-impl Logger for UlLogger {
-    fn log_message(&mut self, log_level: LogLevel, message: String) {
-        println!("{:?}: {}", log_level, message);
-    }
-}
-
 pub struct UltalightTabInfo {
     surface: Surface,
     view: View,
@@ -59,8 +52,6 @@ impl Ultralight {
         let config = Config::start().build().unwrap();
         platform::enable_platform_fontloader();
         platform::enable_platform_filesystem(".").unwrap();
-        platform::set_logger(UlLogger);
-        platform::enable_default_logger("./log.txt").unwrap();
 
         let renderer = Renderer::create(config).unwrap();
         let view_config = ViewConfig::start()
