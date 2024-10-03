@@ -135,7 +135,7 @@ where
 use crate::engines::ultralight::Ultralight;
 
 #[cfg(feature = "ultralight")]
-impl<'a, CustomViewState: Clone> BrowserWidget<Ultralight, CustomViewState> {
+impl<CustomViewState: Clone> BrowserWidget<Ultralight, CustomViewState> {
     pub fn new_basic() -> BrowserWidget<Ultralight, CustomViewState> {
         BrowserWidget {
             engine: Some(Ultralight::new()),

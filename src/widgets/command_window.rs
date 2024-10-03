@@ -5,10 +5,10 @@ use strum::IntoEnumIterator;
 
 use super::Message;
 
-pub enum ResultType {
-    Command(Message),
-    // Bookmark,
-}
+// pub enum ResultType {
+//     Command(Message),
+//     // Bookmark,
+// }
 
 pub struct CommandWindowState {
     pub query: String,

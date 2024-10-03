@@ -4,7 +4,7 @@ use super::Message;
 use crate::Bookmark;
 
 /// Creates bookmark bar widget
-pub fn bookmark_bar(bookmarks: &Vec<Bookmark>) -> Element<Message> {
+pub fn bookmark_bar(bookmarks: &[Bookmark]) -> Element<Message> {
     Row::from_vec(
         bookmarks
             .iter()

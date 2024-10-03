@@ -1,4 +1,4 @@
-use clipboard_rs::{Clipboard, ClipboardContext, ContentFormat};
+use clipboard_rs::{Clipboard, ClipboardContext};
 use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
 use iced::{Point, Size};
@@ -381,7 +381,7 @@ fn iced_key_to_ultralight_key(
     modifiers: keyboard::Modifiers,
     text: Option<SmolStr>,
 ) -> Option<event::KeyEvent> {
-    let (mut text, virtual_key, native_key) = {
+    let (text, virtual_key, native_key) = {
         if let Some(key) = key {
             let text = match key {
                 keyboard::Key::Named(key) => {
@@ -881,7 +881,7 @@ fn iced_key_to_ultralight_key(
         shift: modifiers.shift(),
     };
 
-    let ty = if modifiers.ctrl == true {
+    let ty = if modifiers.ctrl {
         event::KeyEventType::RawKeyDown
     } else if !text.is_empty() && text.is_ascii() && press == KeyPress::Press {
         event::KeyEventType::Char
