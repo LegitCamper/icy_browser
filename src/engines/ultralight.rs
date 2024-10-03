@@ -42,9 +42,7 @@ pub struct UltalightTabInfo {
 
 impl TabInfo for UltalightTabInfo {
     fn title(&self) -> String {
-        self.view
-            .title()
-            .expect("Failed to get title from ultralight")
+        self.view.title().unwrap_or("Title Error".to_string())
     }
 
     fn url(&self) -> String {
@@ -584,7 +582,7 @@ fn iced_key_to_ultralight_key(
                     keyboard::key::Named::F12 => (
                         VirtualKeyCode::F12,
                         #[cfg(windows)]
-                        122,
+                        123,
                         #[cfg(unix)]
                         70,
                     ),
@@ -863,6 +861,97 @@ fn iced_key_to_ultralight_key(
                         186,
                         #[cfg(unix)]
                         39,
+                    ),
+                    "-" => (
+                        VirtualKeyCode::OemMinus,
+                        #[cfg(windows)]
+                        189,
+                        #[cfg(unix)]
+                        12,
+                    ),
+                    "_" => (
+                        VirtualKeyCode::OemMinus,
+                        #[cfg(windows)]
+                        189,
+                        #[cfg(unix)]
+                        12,
+                    ),
+                    "+" => (
+                        VirtualKeyCode::OemPlus,
+                        #[cfg(windows)]
+                        187,
+                        #[cfg(unix)]
+                        78,
+                    ),
+                    "=" => (
+                        VirtualKeyCode::OemPlus,
+                        #[cfg(windows)]
+                        187,
+                        #[cfg(unix)]
+                        78,
+                    ),
+                    "\\" => (
+                        VirtualKeyCode::Oem5,
+                        #[cfg(windows)]
+                        220,
+                        #[cfg(unix)]
+                        43,
+                    ),
+                    "|" => (
+                        VirtualKeyCode::Oem5,
+                        #[cfg(windows)]
+                        220,
+                        #[cfg(unix)]
+                        43,
+                    ),
+                    "`" => (
+                        VirtualKeyCode::Oem3,
+                        #[cfg(windows)]
+                        192,
+                        #[cfg(unix)]
+                        41,
+                    ),
+                    "?" => (
+                        VirtualKeyCode::Oem2,
+                        #[cfg(windows)]
+                        191,
+                        #[cfg(unix)]
+                        53,
+                    ),
+                    "/" => (
+                        VirtualKeyCode::Oem2,
+                        #[cfg(windows)]
+                        191,
+                        #[cfg(unix)]
+                        53,
+                    ),
+                    ">" => (
+                        VirtualKeyCode::Oem102,
+                        #[cfg(windows)]
+                        226,
+                        #[cfg(unix)]
+                        52,
+                    ),
+                    "<" => (
+                        VirtualKeyCode::Oem102,
+                        #[cfg(windows)]
+                        226,
+                        #[cfg(unix)]
+                        52,
+                    ),
+                    "[" => (
+                        VirtualKeyCode::Oem4,
+                        #[cfg(windows)]
+                        219,
+                        #[cfg(unix)]
+                        26,
+                    ),
+                    "]" => (
+                        VirtualKeyCode::Oem6,
+                        #[cfg(windows)]
+                        221,
+                        #[cfg(unix)]
+                        27,
                     ),
                     _ => return None,
                 },
