@@ -8,10 +8,7 @@ fn run() -> (BasicBrowser, Task<Message>) {
         BasicBrowser::new_basic()
             .with_tab_bar()
             .with_nav_bar()
-            .with_bookmark_bar(vec![Bookmark::new(
-                "https://www.rust-lang.org",
-                "rust-lang.org",
-            )])
+            .with_bookmark_bar(&[Bookmark::new("https://www.rust-lang.org", "rust-lang.org")])
             .build(),
         Task::none(),
     )

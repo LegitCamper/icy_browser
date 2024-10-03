@@ -98,6 +98,7 @@ fn to_url(url: &str) -> Option<Url> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Bookmark {
     url: Url,
     name: String,

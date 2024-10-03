@@ -172,8 +172,8 @@ where
         self
     }
 
-    pub fn with_bookmark_bar(mut self, bookmarks: Vec<Bookmark>) -> Self {
-        self.bookmarks = Some(bookmarks);
+    pub fn with_bookmark_bar(mut self, bookmarks: &[Bookmark]) -> Self {
+        self.bookmarks = Some(bookmarks.to_vec());
         self
     }
 
