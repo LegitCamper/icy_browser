@@ -31,6 +31,7 @@ native-tls = ["reqwest/native-tls"]
 rustls-tls = ["reqwest/rustls-tls"]
 
 [dependencies]
+clipboard-rs = "0.2.1"
 iced = { version = "0.13", features = ["advanced", "image", "tokio", "lazy"] }
 iced_aw = { version = "0.10", features = ["tab_bar", "selection_list"] }
 iced_fonts = { version = "0.1.1", features = ["bootstrap"] }
