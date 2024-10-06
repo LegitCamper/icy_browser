@@ -3,7 +3,7 @@ use std::fs::{self, DirEntry};
 use std::path::Path;
 
 fn main() {
-    // ensure runtime resources exist
+    // ensure runtime resources exist - for examples & local tests
     #[cfg(feature = "ultralight-resources")]
     {
         let out = var("OUT_DIR").unwrap();

@@ -98,7 +98,7 @@ impl Default for TabSelectionType {
 pub struct IcyBrowser<Engine: BrowserEngine> {
     engine: Engine,
     home: Url,
-    nav_bar_state: NavBarState,
+    nav_bar_state: Option<NavBarState>,
     command_window_state: CommandWindowState,
     with_tab_bar: bool,
     with_nav_bar: bool,
@@ -108,16 +108,13 @@ pub struct IcyBrowser<Engine: BrowserEngine> {
     view_size: Size<u32>,
 }
 
-impl<Engine> Default for IcyBrowser<Engine>
-where
-    Engine: BrowserEngine,
-{
+impl<Engine: BrowserEngine> Default for IcyBrowser<Engine> {
     fn default() -> Self {
         let home = Url::parse(Self::HOME).unwrap();
         Self {
             engine: Engine::new(),
             home,
-            nav_bar_state: NavBarState::new(),
+            nav_bar_state: None,
             command_window_state: CommandWindowState::new(),
             with_tab_bar: false,
             with_nav_bar: false,
@@ -133,10 +130,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
     const HOME: &'static str = "https://google.com";
 
     pub fn new() -> Self {
-        Self {
-            engine: Engine::new(),
-            ..Default::default()
-        }
+        Self::default()
     }
 
     pub fn with_homepage(mut self, homepage: &str) -> Self {
@@ -151,6 +145,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
     pub fn with_nav_bar(mut self) -> Self {
         self.with_nav_bar = true;
+        self.nav_bar_state = Some(NavBarState::new());
         self
     }
 
@@ -242,7 +237,9 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                     TabSelectionType::Index(index) => self.engine.get_tabs().index_to_id(index),
                 };
                 self.engine.get_tabs_mut().set_current_id(id);
-                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
+                if let Some(state) = self.nav_bar_state.as_mut() {
+                    state.0 = self.engine.get_tabs().get_current().url();
+                }
                 Task::none()
             }
             Message::CloseCurrentTab => Task::done(Message::CloseTab(TabSelectionType::Id(
@@ -259,11 +256,15 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                     TabSelectionType::Index(index) => self.engine.get_tabs().index_to_id(index),
                 };
                 self.engine.get_tabs_mut().remove(id);
-                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
+                if let Some(state) = self.nav_bar_state.as_mut() {
+                    state.0 = self.engine.get_tabs().get_current().url();
+                }
                 Task::none()
             }
             Message::CreateTab => {
-                self.nav_bar_state.0 = self.home.to_string();
+                if let Some(state) = self.nav_bar_state.as_mut() {
+                    state.0 = self.home.to_string();
+                }
                 let home = self.home.clone();
                 let bounds = self.view_size;
                 let tab = self.engine.new_tab(
@@ -279,12 +280,16 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
             }
             Message::GoBackward => {
                 self.engine.go_back();
-                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
+                if let Some(state) = self.nav_bar_state.as_mut() {
+                    state.0 = self.engine.get_tabs().get_current().url();
+                }
                 Task::none()
             }
             Message::GoForward => {
                 self.engine.go_forward();
-                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
+                if let Some(state) = self.nav_bar_state.as_mut() {
+                    state.0 = self.engine.get_tabs().get_current().url();
+                }
                 Task::none()
             }
             Message::Refresh => {
@@ -300,11 +305,15 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 Task::none()
             }
             Message::UpdateUrl => {
-                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
+                if let Some(state) = self.nav_bar_state.as_mut() {
+                    state.0 = self.engine.get_tabs().get_current().url();
+                }
                 Task::none()
             }
             Message::UrlChanged(url) => {
-                self.nav_bar_state.0 = url;
+                if let Some(state) = self.nav_bar_state.as_mut() {
+                    state.0 = url;
+                }
                 Task::none()
             }
             Message::QueryChanged(query) => {
@@ -385,8 +394,10 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
             column = column.push(tab_bar(self.engine.get_tabs()))
         }
         if self.with_nav_bar {
-            column = column
-                .push(hoverable(nav_bar(&self.nav_bar_state)).on_focus_change(Message::UpdateUrl))
+            column = column.push(
+                hoverable(nav_bar(self.nav_bar_state.as_ref().unwrap()))
+                    .on_focus_change(Message::UpdateUrl),
+            )
         }
         if let Some(bookmarks) = self.bookmarks.as_ref() {
             column = column.push(bookmark_bar(bookmarks))
