@@ -6,8 +6,8 @@ use iced::{Element, Settings, Subscription, Task};
 use std::time::Duration;
 
 use icy_browser::{
-    get_fonts, widgets, BasicBrowser, Bookmark, BrowserWidget, KeyType, Message as WidgetMessage,
-    ShortcutBuilder, ShortcutModifier,
+    get_fonts, widgets, Bookmark, IcyBrowser, KeyType, Message as WidgetMessage, ShortcutBuilder,
+    ShortcutModifier, Ultralight,
 };
 
 fn main() -> iced::Result {
@@ -33,7 +33,7 @@ pub enum Message {
 }
 
 struct Browser {
-    widgets: BasicBrowser,
+    icy_browser: IcyBrowser<Ultralight>,
 }
 
 impl Default for Browser {
@@ -47,7 +47,7 @@ impl Default for Browser {
                 ],
             )
             .build();
-        let widgets = BrowserWidget::new_basic()
+        let widgets = IcyBrowser::new()
             .with_custom_shortcuts(shortcuts)
             .with_tab_bar()
             .with_bookmark_bar(&[
@@ -60,24 +60,26 @@ impl Default for Browser {
             ])
             .build();
 
-        Self { widgets }
+        Self {
+            icy_browser: widgets,
+        }
     }
 }
 
 impl Browser {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::BrowserWidget(msg) => self.widgets.update(msg).map(Message::BrowserWidget),
-            Message::Update => self.widgets.force_update().map(Message::BrowserWidget),
+            Message::BrowserWidget(msg) => self.icy_browser.update(msg).map(Message::BrowserWidget),
+            Message::Update => self.icy_browser.force_update().map(Message::BrowserWidget),
             Message::Event(event) => self
-                .widgets
-                .update(widgets::Message::Event(Some(event)))
+                .icy_browser
+                .update(widgets::Message::IcedEvent(Some(event)))
                 .map(Message::BrowserWidget),
         }
     }
 
     fn view(&self) -> Element<Message> {
-        self.widgets.view().map(Message::BrowserWidget)
+        self.icy_browser.view().map(Message::BrowserWidget)
     }
 
     fn subscription(&self) -> Subscription<Message> {

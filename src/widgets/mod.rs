@@ -1,8 +1,7 @@
 use command_window::CommandWindowState;
-use iced::event::{self, Event};
 use iced::keyboard::{self, key};
 use iced::widget::{self, column};
-use iced::{mouse, Element, Point, Size, Subscription, Task};
+use iced::{mouse, Element, Event, Point, Size, Subscription, Task};
 use iced_on_focus_widget::hoverable;
 use nav_bar::NavBarState;
 use std::string::ToString;
@@ -13,20 +12,35 @@ use url::Url;
 mod browser_view;
 pub use browser_view::browser_view;
 
-mod nav_bar;
+pub mod nav_bar;
 pub use nav_bar::nav_bar;
 
-mod tab_bar;
+pub mod tab_bar;
 pub use tab_bar::tab_bar;
 
-mod bookmark_bar;
+pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 
-mod command_window;
+pub mod command_window;
 pub use command_window::command_window;
 
-use crate::Bookmark;
-use crate::{engines::BrowserEngine, shortcut::check_shortcut, to_url, ImageInfo, Shortcuts};
+use crate::{
+    engines::BrowserEngine, shortcut::check_shortcut, to_url, Bookmark, Bookmarks, ImageInfo,
+    Shortcuts,
+};
+
+/// Allows users to implement their own custom view view with custom widgets and configurations
+pub trait CustomWidget<Message> {
+    fn update(&mut self, message: Message);
+    fn view(
+        &self,
+        nav_bar_state: NavBarState,
+        command_window_state: CommandWindowState,
+        bookmarks: Option<Vec<Bookmark>>,
+        shortcuts: Shortcuts,
+    );
+    fn subscription(&self) -> Subscription<Message>;
+}
 
 // Options exist only to have defaults for EnumIter
 #[derive(Debug, Clone, PartialEq, Display, EnumIter)]
@@ -66,7 +80,7 @@ pub enum Message {
     SendKeyboardEvent(Option<keyboard::Event>),
     SendMouseEvent(Point, Option<mouse::Event>),
     UpdateViewSize(Size<u32>),
-    Event(Option<Event>),
+    IcedEvent(Option<iced::Event>),
 }
 
 /// Allows different widgets to interact in their native way
@@ -81,46 +95,30 @@ impl Default for TabSelectionType {
     }
 }
 
-/// Allows users to create their own views with the same information of native widgets
-pub type CustomView<Engine, CustomViewState> = fn(
-    &BrowserWidget<Engine, CustomViewState>,
-    custom_view_state: CustomViewState,
-) -> Element<Message>;
-
-/// Allows users to create their own updates with the same information of native widgets
-pub type CustomUpdate<'a, Engine, CustomViewState> = fn(
-    &BrowserWidget<Engine, CustomViewState>,
-    custom_view_state: &mut CustomViewState,
-) -> Element<'a, Message>;
-
-pub struct BrowserWidget<Engine: BrowserEngine, CustomViewState: Clone> {
-    pub engine: Option<Engine>,
-    pub home: Url,
-    pub nav_bar_state: NavBarState,
-    pub command_window_state: CommandWindowState,
-    custom_view: Option<CustomView<Engine, CustomViewState>>,
-    custom_view_state: Option<CustomViewState>,
-    pub with_tab_bar: bool,
-    pub with_nav_bar: bool,
-    pub bookmarks: Option<Vec<Bookmark>>,
-    pub show_overlay: bool,
-    pub shortcuts: Shortcuts,
-    pub view_size: Size<u32>,
+pub struct IcyBrowser<Engine: BrowserEngine> {
+    engine: Engine,
+    home: Url,
+    nav_bar_state: NavBarState,
+    command_window_state: CommandWindowState,
+    with_tab_bar: bool,
+    with_nav_bar: bool,
+    bookmarks: Option<Bookmarks>,
+    show_overlay: bool,
+    shortcuts: Shortcuts,
+    view_size: Size<u32>,
 }
 
-impl<Engine, CustomViewState: Clone> Default for BrowserWidget<Engine, CustomViewState>
+impl<Engine> Default for IcyBrowser<Engine>
 where
     Engine: BrowserEngine,
 {
     fn default() -> Self {
         let home = Url::parse(Self::HOME).unwrap();
         Self {
-            engine: None,
+            engine: Engine::new(),
             home,
             nav_bar_state: NavBarState::new(),
             command_window_state: CommandWindowState::new(),
-            custom_view: None,
-            custom_view_state: None,
             with_tab_bar: false,
             with_nav_bar: false,
             bookmarks: None,
@@ -131,28 +129,12 @@ where
     }
 }
 
-#[cfg(feature = "ultralight")]
-use crate::engines::ultralight::Ultralight;
-
-#[cfg(feature = "ultralight")]
-impl<CustomViewState: Clone> BrowserWidget<Ultralight, CustomViewState> {
-    pub fn new_basic() -> BrowserWidget<Ultralight, CustomViewState> {
-        BrowserWidget {
-            engine: Some(Ultralight::new()),
-            ..BrowserWidget::default()
-        }
-    }
-}
-
-impl<Engine, CustomViewState: Clone> BrowserWidget<Engine, CustomViewState>
-where
-    Engine: BrowserEngine,
-{
+impl<Engine: BrowserEngine> IcyBrowser<Engine> {
     const HOME: &'static str = "https://google.com";
 
     pub fn new() -> Self {
         Self {
-            engine: Some(Engine::new()),
+            engine: Engine::new(),
             ..Default::default()
         }
     }
@@ -182,51 +164,34 @@ where
         self
     }
 
-    pub fn with_custom_view(
-        mut self,
-        custom_view: CustomView<Engine, CustomViewState>,
-        custom_view_state: CustomViewState,
-    ) -> Self {
-        self.custom_view = Some(custom_view);
-        self.custom_view_state = Some(custom_view_state);
-        self
-    }
-
     pub fn build(self) -> Self {
-        assert!(self.engine.is_some());
-
         let mut build = Self { ..self };
         let _ = build.update(Message::CreateTab); // disregaurd task::none() for update
         build
     }
 
+    /// Allows creation of custom widgets that need interal info
     pub fn engine(&self) -> &Engine {
-        self.engine
-            .as_ref()
-            .expect("Browser was created without a backend engine!")
+        &self.engine
     }
 
-    fn engine_mut(&mut self) -> &mut Engine {
-        self.engine
-            .as_mut()
-            .expect("Browser was created without a backend engine!")
+    /// Allows creation of custom widgets that need interal info
+    pub fn mut_engine(&mut self) -> &mut Engine {
+        &mut self.engine
     }
 
     fn update_engine(&mut self) {
-        self.engine().do_work();
-        if self.engine().has_loaded() {
-            if self.engine().need_render() {
-                let (format, image_data) = self.engine_mut().pixel_buffer();
+        self.engine.do_work();
+        if self.engine.has_loaded() {
+            if self.engine.need_render() {
+                let (format, image_data) = self.engine.pixel_buffer();
                 let view = ImageInfo::new(
                     image_data,
                     format,
                     self.view_size.width,
                     self.view_size.height,
                 );
-                self.engine_mut()
-                    .get_tabs_mut()
-                    .get_current_mut()
-                    .set_view(view)
+                self.engine.get_tabs_mut().get_current_mut().set_view(view)
             }
         } else {
             let view = ImageInfo {
@@ -234,118 +199,108 @@ where
                 height: self.view_size.height,
                 ..Default::default()
             };
-            self.engine_mut()
-                .get_tabs_mut()
-                .get_current_mut()
-                .set_view(view)
+            self.engine.get_tabs_mut().get_current_mut().set_view(view)
         }
     }
 
     /// This is used to periodically update browserview
     pub fn force_update(&mut self) -> Task<Message> {
-        self.engine().do_work();
-        let (format, image_data) = self.engine_mut().pixel_buffer();
+        self.engine.do_work();
+        let (format, image_data) = self.engine.pixel_buffer();
         let view = ImageInfo::new(
             image_data,
             format,
             self.view_size.width,
             self.view_size.height,
         );
-        self.engine_mut()
-            .get_tabs_mut()
-            .get_current_mut()
-            .set_view(view);
+        self.engine.get_tabs_mut().get_current_mut().set_view(view);
 
         Task::none()
     }
 
-    pub fn update(&mut self, message: Message) -> Task<Message> {
-        let task = match message {
+    pub fn update(&mut self, event: Message) -> Task<Message> {
+        let task = match event {
             Message::Update => self.force_update(),
             Message::UpdateViewSize(size) => {
                 self.view_size = size;
-                self.engine_mut().resize(size);
+                self.engine.resize(size);
                 Task::none()
             }
             Message::SendKeyboardEvent(event) => {
-                self.engine()
+                self.engine
                     .handle_keyboard_event(event.expect("Value cannot be none"));
                 Task::none()
             }
             Message::SendMouseEvent(point, event) => {
-                self.engine_mut()
+                self.engine
                     .handle_mouse_event(point, event.expect("Value cannot be none"));
                 Task::none()
             }
             Message::ChangeTab(index_type) => {
                 let id = match index_type {
                     TabSelectionType::Id(id) => id,
-                    TabSelectionType::Index(index) => {
-                        self.engine_mut().get_tabs().index_to_id(index)
-                    }
+                    TabSelectionType::Index(index) => self.engine.get_tabs().index_to_id(index),
                 };
-                self.engine_mut().get_tabs_mut().set_current_id(id);
-                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
+                self.engine.get_tabs_mut().set_current_id(id);
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::CloseCurrentTab => Task::done(Message::CloseTab(TabSelectionType::Id(
-                self.engine().get_tabs().get_current_id(),
+                self.engine.get_tabs().get_current_id(),
             ))),
             Message::CloseTab(index_type) => {
                 // ensure there is always at least one tab
-                if self.engine().get_tabs().tabs().len() == 1 {
+                if self.engine.get_tabs().tabs().len() == 1 {
                     let _ = self.update(Message::CreateTab); // ignore task
                 }
 
                 let id = match index_type {
                     TabSelectionType::Id(id) => id,
-                    TabSelectionType::Index(index) => {
-                        self.engine_mut().get_tabs().index_to_id(index)
-                    }
+                    TabSelectionType::Index(index) => self.engine.get_tabs().index_to_id(index),
                 };
-                self.engine_mut().get_tabs_mut().remove(id);
-                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
+                self.engine.get_tabs_mut().remove(id);
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::CreateTab => {
                 self.nav_bar_state.0 = self.home.to_string();
                 let home = self.home.clone();
                 let bounds = self.view_size;
-                let tab = self.engine_mut().new_tab(
+                let tab = self.engine.new_tab(
                     home.clone(),
                     Size::new(bounds.width + 10, bounds.height - 10),
                 );
-                let id = self.engine_mut().get_tabs_mut().insert(tab);
-                self.engine_mut().get_tabs_mut().set_current_id(id);
-                self.engine_mut().force_need_render();
-                self.engine_mut().resize(bounds);
-                self.engine().goto_url(&home);
+                let id = self.engine.get_tabs_mut().insert(tab);
+                self.engine.get_tabs_mut().set_current_id(id);
+                self.engine.force_need_render();
+                self.engine.resize(bounds);
+                self.engine.goto_url(&home);
                 Task::none()
             }
             Message::GoBackward => {
-                self.engine().go_back();
-                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
+                self.engine.go_back();
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::GoForward => {
-                self.engine().go_forward();
-                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
+                self.engine.go_forward();
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::Refresh => {
-                self.engine().refresh();
+                self.engine.refresh();
                 Task::none()
             }
             Message::GoHome => {
-                self.engine().goto_url(&self.home);
+                self.engine.goto_url(&self.home);
                 Task::none()
             }
             Message::GoToUrl(url) => {
-                self.engine().goto_url(&to_url(&url).unwrap());
+                self.engine.goto_url(&to_url(&url).unwrap());
                 Task::none()
             }
             Message::UpdateUrl => {
-                self.nav_bar_state.0 = self.engine().get_tabs().get_current().url();
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::UrlChanged(url) => {
@@ -379,7 +334,7 @@ where
                 self.show_overlay = false;
                 widget::focus_next()
             }
-            Message::Event(event) => {
+            Message::IcedEvent(event) => {
                 match event {
                     Some(Event::Keyboard(key)) => {
                         if let iced::keyboard::Event::KeyPressed {
@@ -424,52 +379,37 @@ where
     }
 
     pub fn view(&self) -> Element<Message> {
-        match self.custom_view {
-            Some(custom_view) => {
-                if let Some(state) = &self.custom_view_state {
-                    custom_view(self, state.clone())
-                } else {
-                    panic!(
-                    "If Custom View is set, Custom View State must be set too. Use () if unused",
-                    )
-                }
-            }
-            None => {
-                let mut column = column![];
+        let mut column = column![];
 
-                if self.with_tab_bar {
-                    column = column.push(tab_bar(self.engine().get_tabs()))
-                }
-                if self.with_nav_bar {
-                    column = column.push(
-                        hoverable(nav_bar(&self.nav_bar_state)).on_focus_change(Message::UpdateUrl),
-                    )
-                }
-                if let Some(bookmarks) = self.bookmarks.as_ref() {
-                    column = column.push(bookmark_bar(bookmarks))
-                }
-
-                let browser_view = browser_view(
-                    self.view_size,
-                    self.engine().get_tabs().get_current().get_view(),
-                    !self.show_overlay,
-                );
-                if self.show_overlay {
-                    column = column.push(command_window(browser_view, &self.command_window_state))
-                } else {
-                    column = column.push(browser_view);
-                }
-
-                column.into()
-            }
+        if self.with_tab_bar {
+            column = column.push(tab_bar(self.engine.get_tabs()))
         }
+        if self.with_nav_bar {
+            column = column
+                .push(hoverable(nav_bar(&self.nav_bar_state)).on_focus_change(Message::UpdateUrl))
+        }
+        if let Some(bookmarks) = self.bookmarks.as_ref() {
+            column = column.push(bookmark_bar(bookmarks))
+        }
+
+        let browser_view = browser_view(
+            self.view_size,
+            self.engine.get_tabs().get_current().get_view(),
+            !self.show_overlay,
+        );
+        if self.show_overlay {
+            column = column.push(command_window(browser_view, &self.command_window_state))
+        } else {
+            column = column.push(browser_view);
+        }
+
+        column.into()
     }
 
     pub fn subscription(&self) -> Subscription<Message> {
         Subscription::batch([
             iced::time::every(Duration::from_millis(10)).map(move |_| Message::Update),
-            // This is needed for child widgets such as overlay to detect Key events
-            event::listen().map(|e: Event| Message::Event(Some(e))),
+            iced::event::listen().map(|e: iced::Event| Message::IcedEvent(Some(e))),
         ])
     }
 }
