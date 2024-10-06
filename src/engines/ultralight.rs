@@ -1,3 +1,4 @@
+use clipboard_rs::{Clipboard, ClipboardContext};
 use iced::keyboard::{self};
 use iced::mouse::{self, ScrollDelta};
 use iced::{Point, Size};
@@ -7,7 +8,7 @@ use ul_next::{
     config::Config,
     event::{self, KeyEventCreationInfo, MouseEvent, ScrollEvent},
     key_code::VirtualKeyCode,
-    platform::{self, LogLevel, Logger},
+    platform,
     renderer::Renderer,
     view::{View, ViewConfig},
     window::Cursor,
@@ -15,15 +16,21 @@ use ul_next::{
 };
 use url::Url;
 
-#[cfg(not(debug_assertions))]
-use env_home::env_home_dir;
-
 use super::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 
-struct UlLogger;
-impl Logger for UlLogger {
-    fn log_message(&mut self, log_level: LogLevel, message: String) {
-        println!("{:?}: {}", log_level, message);
+struct UlClipboard;
+impl platform::Clipboard for UlClipboard {
+    fn clear(&mut self) {}
+
+    fn read_plain_text(&mut self) -> Option<String> {
+        let ctx = clipboard_rs::ClipboardContext::new().ok()?;
+        Some(ctx.get_text().unwrap_or("".to_string()))
+    }
+
+    fn write_plain_text(&mut self, text: &str) {
+        let ctx = ClipboardContext::new().expect("Failed to open clipboard");
+        ctx.set_text(text.into())
+            .expect("Failed to set contents of clipboard");
     }
 }
 
@@ -35,9 +42,7 @@ pub struct UltalightTabInfo {
 
 impl TabInfo for UltalightTabInfo {
     fn title(&self) -> String {
-        self.view
-            .title()
-            .expect("Failed to get title from ultralight")
+        self.view.title().unwrap_or("Title Error".to_string())
     }
 
     fn url(&self) -> String {
@@ -61,26 +66,8 @@ impl Ultralight {
     pub fn new() -> Self {
         let config = Config::start().build().unwrap();
         platform::enable_platform_fontloader();
-
-        #[cfg(not(debug_assertions))]
-        let mut home_dir = env_home_dir().unwrap();
-        #[cfg(not(debug_assertions))]
-        home_dir.push(".icy_browser");
-        #[cfg(not(debug_assertions))]
-        platform::enable_platform_filesystem(home_dir.as_path()).unwrap();
-
-        #[cfg(debug_assertions)]
         platform::enable_platform_filesystem(".").unwrap();
-
-        platform::set_logger(UlLogger);
-
-        #[cfg(not(debug_assertions))]
-        home_dir.push("logs.txt");
-        #[cfg(not(debug_assertions))]
-        platform::enable_default_logger(home_dir.as_path()).unwrap();
-
-        #[cfg(debug_assertions)]
-        platform::enable_default_logger("./logs.txt").unwrap();
+        platform::set_clipboard(UlClipboard);
 
         let renderer = Renderer::create(config).unwrap();
         let view_config = ViewConfig::start()
@@ -270,10 +257,11 @@ impl BrowserEngine for Ultralight {
                 location,
                 modifiers,
                 text,
-                modified_key: _,
+                modified_key,
                 physical_key: _,
             } => iced_key_to_ultralight_key(
                 KeyPress::Press,
+                Some(modified_key),
                 Some(key),
                 Some(location),
                 modifiers,
@@ -285,13 +273,14 @@ impl BrowserEngine for Ultralight {
                 modifiers,
             } => iced_key_to_ultralight_key(
                 KeyPress::Unpress,
+                None,
                 Some(key),
                 Some(location),
                 modifiers,
                 None,
             ),
             keyboard::Event::ModifiersChanged(modifiers) => {
-                iced_key_to_ultralight_key(KeyPress::Press, None, None, modifiers, None)
+                iced_key_to_ultralight_key(KeyPress::Press, None, None, None, modifiers, None)
             }
         };
 
@@ -384,7 +373,8 @@ enum KeyPress {
 
 fn iced_key_to_ultralight_key(
     press: KeyPress,
-    key: Option<keyboard::Key>,
+    modified_key: Option<keyboard::Key>,
+    key: Option<keyboard::Key>, // This one is modified by ctrl and results in wrong key
     _location: Option<keyboard::Location>,
     modifiers: keyboard::Modifiers,
     text: Option<SmolStr>,
@@ -592,7 +582,7 @@ fn iced_key_to_ultralight_key(
                     keyboard::key::Named::F12 => (
                         VirtualKeyCode::F12,
                         #[cfg(windows)]
-                        122,
+                        123,
                         #[cfg(unix)]
                         70,
                     ),
@@ -872,6 +862,97 @@ fn iced_key_to_ultralight_key(
                         #[cfg(unix)]
                         39,
                     ),
+                    "-" => (
+                        VirtualKeyCode::OemMinus,
+                        #[cfg(windows)]
+                        189,
+                        #[cfg(unix)]
+                        12,
+                    ),
+                    "_" => (
+                        VirtualKeyCode::OemMinus,
+                        #[cfg(windows)]
+                        189,
+                        #[cfg(unix)]
+                        12,
+                    ),
+                    "+" => (
+                        VirtualKeyCode::OemPlus,
+                        #[cfg(windows)]
+                        187,
+                        #[cfg(unix)]
+                        78,
+                    ),
+                    "=" => (
+                        VirtualKeyCode::OemPlus,
+                        #[cfg(windows)]
+                        187,
+                        #[cfg(unix)]
+                        78,
+                    ),
+                    "\\" => (
+                        VirtualKeyCode::Oem5,
+                        #[cfg(windows)]
+                        220,
+                        #[cfg(unix)]
+                        43,
+                    ),
+                    "|" => (
+                        VirtualKeyCode::Oem5,
+                        #[cfg(windows)]
+                        220,
+                        #[cfg(unix)]
+                        43,
+                    ),
+                    "`" => (
+                        VirtualKeyCode::Oem3,
+                        #[cfg(windows)]
+                        192,
+                        #[cfg(unix)]
+                        41,
+                    ),
+                    "?" => (
+                        VirtualKeyCode::Oem2,
+                        #[cfg(windows)]
+                        191,
+                        #[cfg(unix)]
+                        53,
+                    ),
+                    "/" => (
+                        VirtualKeyCode::Oem2,
+                        #[cfg(windows)]
+                        191,
+                        #[cfg(unix)]
+                        53,
+                    ),
+                    ">" => (
+                        VirtualKeyCode::Oem102,
+                        #[cfg(windows)]
+                        226,
+                        #[cfg(unix)]
+                        52,
+                    ),
+                    "<" => (
+                        VirtualKeyCode::Oem102,
+                        #[cfg(windows)]
+                        226,
+                        #[cfg(unix)]
+                        52,
+                    ),
+                    "[" => (
+                        VirtualKeyCode::Oem4,
+                        #[cfg(windows)]
+                        219,
+                        #[cfg(unix)]
+                        26,
+                    ),
+                    "]" => (
+                        VirtualKeyCode::Oem6,
+                        #[cfg(windows)]
+                        221,
+                        #[cfg(unix)]
+                        27,
+                    ),
                     _ => return None,
                 },
                 keyboard::Key::Unidentified => return None,
@@ -882,7 +963,16 @@ fn iced_key_to_ultralight_key(
         }
     };
 
-    let ty = if !text.is_empty() && text.is_ascii() && press == KeyPress::Press {
+    let modifiers = event::KeyEventModifiers {
+        alt: modifiers.alt(),
+        ctrl: modifiers.control(),
+        meta: modifiers.logo(),
+        shift: modifiers.shift(),
+    };
+
+    let ty = if modifiers.ctrl {
+        event::KeyEventType::RawKeyDown
+    } else if !text.is_empty() && text.is_ascii() && press == KeyPress::Press {
         event::KeyEventType::Char
     } else {
         match press {
@@ -891,25 +981,19 @@ fn iced_key_to_ultralight_key(
         }
     };
 
-    let modifiers = event::KeyEventModifiers {
-        alt: modifiers.alt(),
-        ctrl: modifiers.control(),
-        meta: modifiers.logo(),
-        shift: modifiers.shift(),
-    };
-
     let creation_info = KeyEventCreationInfo {
         ty,
         modifiers,
         virtual_key_code: virtual_key,
         native_key_code: native_key,
         text: text.as_str(),
-        unmodified_text: text.as_str(),
+        unmodified_text: if let Some(keyboard::Key::Character(char)) = modified_key {
+            &char.to_string()
+        } else {
+            text.as_str()
+        },
         is_keypad: false,
         is_auto_repeat: false,
-        #[cfg(windows)]
-        is_system_key: true,
-        #[cfg(not(windows))]
         is_system_key: false,
     };
 

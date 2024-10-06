@@ -3,21 +3,20 @@
 use iced::event::{self, Event};
 use iced::Theme;
 use iced::{Element, Settings, Subscription, Task};
-use iced_aw::BOOTSTRAP_FONT_BYTES;
 use std::time::Duration;
 
 use icy_browser::{
-    widgets, BrowserWidget, KeyType, Message as WidgetMessage, ShortcutBuilder, ShortcutModifier,
-    Ultralight,
+    get_fonts, widgets, Bookmark, IcyBrowser, KeyType, Message as WidgetMessage, ShortcutBuilder,
+    ShortcutModifier, Ultralight,
 };
 
 fn main() -> iced::Result {
-    // This imports `icons` for widgets
-    let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
     let settings = Settings {
-        fonts: vec![bootstrap_font],
+        fonts: get_fonts(),
         ..Default::default()
     };
+
+    println!("Press 'Crtl + E' to open to Command palatte");
 
     iced::application("Keyboard Driven Browser", Browser::update, Browser::view)
         .subscription(Browser::subscription)
@@ -34,7 +33,7 @@ pub enum Message {
 }
 
 struct Browser {
-    widgets: BrowserWidget<Ultralight>,
+    icy_browser: IcyBrowser<Ultralight>,
 }
 
 impl Default for Browser {
@@ -48,30 +47,39 @@ impl Default for Browser {
                 ],
             )
             .build();
-        let widgets = BrowserWidget::new_with_ultralight()
+        let widgets = IcyBrowser::new()
             .with_custom_shortcuts(shortcuts)
             .with_tab_bar()
-            .with_nav_bar()
+            .with_bookmark_bar(&[
+                Bookmark::new("https://www.rust-lang.org", "rust-lang.org"),
+                Bookmark::new(
+                    "https://github.com/LegitCamper/icy_browser",
+                    "icy_browser github",
+                ),
+                Bookmark::new("https://docs.rs/iced/latest/iced/", "iced docs"),
+            ])
             .build();
 
-        Self { widgets }
+        Self {
+            icy_browser: widgets,
+        }
     }
 }
 
 impl Browser {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::BrowserWidget(msg) => self.widgets.update(msg).map(Message::BrowserWidget),
-            Message::Update => self.widgets.force_update().map(Message::BrowserWidget),
+            Message::BrowserWidget(msg) => self.icy_browser.update(msg).map(Message::BrowserWidget),
+            Message::Update => self.icy_browser.force_update().map(Message::BrowserWidget),
             Message::Event(event) => self
-                .widgets
-                .update(widgets::Message::Event(Some(event)))
+                .icy_browser
+                .update(widgets::Message::IcedEvent(Some(event)))
                 .map(Message::BrowserWidget),
         }
     }
 
     fn view(&self) -> Element<Message> {
-        self.widgets.view().map(Message::BrowserWidget)
+        self.icy_browser.view().map(Message::BrowserWidget)
     }
 
     fn subscription(&self) -> Subscription<Message> {

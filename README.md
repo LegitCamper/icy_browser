@@ -1,13 +1,7 @@
 ## Iced library to create custom browsers
+<img src="https://raw.githubusercontent.com/gist/hecrj/ad7ecd38f6e47ff3688a38c79fd108f0/raw/74384875ecbad02ae2a926425e9bcafd0695bade/color.svg" width=20%>
 
-[![Build](https://github.com/LegitCamper/rust-browser/actions/workflows/ci.yml/badge.svg)](https://github.com/LegitCamper/rust-browser/actions/workflows/ci.yml)
-<img src="https://raw.githubusercontent.com/gist/hecrj/ad7ecd38f6e47ff3688a38c79fd108f0/raw/74384875ecbad02ae2a926425e9bcafd0695bade/color.svg" width=8%>
-
-### Supported Platforms
-| Platform | Support               |
-| Windows  | <span>&#10003;</span> |
-| Linux    | <span>&#10003;</span> |
-
+[![Build](https://github.com/LegitCamper/icy_browser/actions/workflows/ci.yml/badge.svg)](https://github.com/LegitCamper/icy_browser/actions/workflows/ci.yml)
 
 ### Supported Browser Engines
 | Browser Engine | Support      |
@@ -19,64 +13,38 @@
 ### Browser Widgets
 - Navigation Bar
 - Tab Bar
+- Bookmark Bar
 - Browser View
 
 ### Examples
 #### basic_browser.rs
-<img src="https://github.com/LegitCamper/rust-browser/blob/main/assets/basic_browser.png" width=50%>
+<img src="https://github.com/LegitCamper/icy_browser/blob/main/assets/basic_browser.png?raw=true" width=50%>
 
 ``` Rust
-use iced::{Element, Settings, Theme};
-use iced_aw::BOOTSTRAP_FONT_BYTES;
+use iced::{Settings, Task, Theme};
+use icy_browser::{get_fonts, Bookmark, IcyBrowser, Message, Ultralight};
 
-use icy_browser::{widgets, BrowserWidget, Ultralight};
+fn run() -> (IcyBrowser<Ultralight>, Task<Message>) {
+    (
+        IcyBrowser::new()
+            .with_tab_bar()
+            .with_nav_bar()
+            .with_bookmark_bar(&[Bookmark::new("https://www.rust-lang.org", "rust-lang.org")])
+            .build(),
+        Task::none(),
+    )
+}
 
 fn main() -> iced::Result {
-    // This imports `icons` for widgets
-    let bootstrap_font = BOOTSTRAP_FONT_BYTES.into();
     let settings = Settings {
-        fonts: vec![bootstrap_font],
+        fonts: get_fonts(),
         ..Default::default()
     };
 
-    iced::application("Basic Browser Example", Browser::update, Browser::view)
+    iced::application("Basic Browser", IcyBrowser::update, IcyBrowser::view)
+        .subscription(IcyBrowser::subscription)
         .settings(settings)
         .theme(|_| Theme::Dark)
-        .run()
-}
-
-#[derive(Debug, Clone)]
-pub enum Message {
-    BrowserWidget(widgets::Message),
-}
-
-struct Browser {
-    widgets: BrowserWidget<Ultralight>,
-}
-
-impl Browser {
-    fn update(&mut self, message: Message) {
-        match message {
-            Message::BrowserWidget(msg) => {
-                self.widgets.update(msg);
-            }
-        }
-    }
-
-    fn view(&self) -> Element<Message> {
-        self.widgets.view().map(Message::BrowserWidget)
-    }
-}
-
-impl Default for Browser {
-    fn default() -> Self {
-        let widgets = BrowserWidget::new_with_ultralight()
-            .with_tab_bar()
-            .with_nav_bar()
-            .with_browsesr_view()
-            .build();
-
-        Self { widgets }
-    }
+        .run_with(run)
 }
 ```

@@ -1,15 +1,28 @@
+use std::env::var;
 use std::fs::{self, DirEntry};
 use std::path::Path;
 
-const PATH: &str = env!("CARGO_MANIFEST_DIR");
-
 fn main() {
-    // ensure runtime resources exist
-    #[cfg(feature = "ultralight")]
+    // ensure runtime resources exist - for examples & local tests
+    #[cfg(feature = "ultralight-resources")]
     {
+        let out = var("OUT_DIR").unwrap();
+        // This allows it to work in this project but also other projects too
+        let path = Path::new(&out)
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap();
+
         let mut possible_directories = Vec::new();
 
-        let target = Path::new(PATH).join("target");
+        let target = Path::new(path).join("target");
         let debug_path = target.clone().join("debug");
         let release_path = target.clone().join("release");
 
@@ -33,33 +46,24 @@ fn main() {
 
         assert!(!possible_directories.is_empty());
 
-        let local_resources = Path::new(PATH).join("resources");
+        let local_resources = Path::new(path).join("resources");
 
         for path in possible_directories {
-            if let Ok(resources) = fs::exists(path.path().join("out/ul-sdk/resources")) {
+            let resources_dir = path.path().join("out/ul-sdk/resources");
+            if let Ok(resources) = fs::exists(resources_dir.clone()) {
                 if resources {
                     if let Ok(local_resources_exist) = fs::exists(local_resources.clone()) {
                         if local_resources_exist {
-                            fs::remove_dir_all(local_resources.clone())
+                            fs::remove_file(local_resources.clone())
                                 .expect("Failed to delete resources dir")
                         }
                     }
 
-                    fs::create_dir(local_resources.clone())
-                        .expect("Failed to create resources dir");
-
-                    copy_file(
-                        path.path().join("out/ul-sdk/resources").as_path(),
-                        local_resources.clone().join("").as_path(),
-                        "cacert.pem",
-                    )
-                    .expect("Failed to copy cacert.pem");
-                    copy_file(
-                        path.path().join("out/ul-sdk/resources").as_path(),
-                        local_resources.clone().join("").as_path(),
-                        "icudt67l.dat",
-                    )
-                    .expect("Failed to copy icudt67l.dat");
+                    #[cfg(unix)]
+                    {
+                        std::os::unix::fs::symlink(resources_dir, local_resources)
+                            .expect("Failed to sym link resource dir")
+                    }
 
                     break;
                 }
@@ -69,13 +73,9 @@ fn main() {
         }
     }
 
-    println!("cargo:rerun-if-changed=resources");
+    println!("cargo:rerun-if-changed=target");
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=Cargo.lock");
-}
-
-fn copy_file(from: &Path, to: &Path, file_name: &str) -> Result<u64, std::io::Error> {
-    fs::copy(from.join(file_name), to.join(file_name))
 }
 
 fn get_paths(possible_paths: &mut Vec<fs::DirEntry>, path_str: String) {
