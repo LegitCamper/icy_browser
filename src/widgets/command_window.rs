@@ -1,70 +1,80 @@
 use iced::widget::{center, column, container, mouse_area, opaque, stack, text_input};
-use iced::{border, Color, Element, Font, Length, Theme};
-use iced_aw::SelectionList;
-use strum::IntoEnumIterator;
+use iced::{border, Color, Element, Length, Theme};
 
 use super::Message;
+use crate::Bookmark;
 
-// pub enum ResultType {
-//     Command(Message),
-//     // Bookmark,
-// }
+mod results;
+pub use results::{results_list, ResultType};
 
 pub struct CommandWindowState {
     pub query: String,
-    commands: Vec<String>,
-    pub selected_action: String,
-    pub selected_index: usize,
+    pub possible_results: Vec<ResultType>,
+    pub filtered_results: Vec<ResultType>,
+    pub selected_item: Option<String>,
 }
 
 impl CommandWindowState {
-    pub fn new() -> Self {
+    pub fn new(bookmarks: Option<Vec<Bookmark>>) -> Self {
+        // This may need to be extended in the future
+        let mut results: Vec<ResultType> = Vec::new();
+        results.extend(
+            vec![
+                Message::GoBackward,
+                Message::GoForward,
+                Message::Refresh,
+                Message::GoHome,
+                Message::CloseCurrentTab,
+            ]
+            .into_iter()
+            .map(|msg| ResultType::Command(msg)),
+        );
+        if let Some(bookmarks) = bookmarks {
+            results.extend(
+                bookmarks
+                    .into_iter()
+                    .map(|bookmark| ResultType::Bookmark(bookmark)),
+            );
+        };
+
         Self {
             query: String::new(),
-            commands: Message::iter().map(|e| e.clone().to_string()).collect(),
-            selected_action: String::new(),
-            selected_index: 0,
+            possible_results: results.clone(),
+            filtered_results: results,
+            selected_item: None,
         }
     }
 }
 
 impl Default for CommandWindowState {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
 pub fn command_window<'a>(
     base: impl Into<Element<'a, Message>>,
-    state: &'a CommandWindowState,
+    state: &CommandWindowState,
 ) -> Element<'a, Message> {
-    let window = container(column![
-        text_input("Command Menu", &state.query)
-            .on_input(Message::QueryChanged)
-            .size(25),
-        SelectionList::new_with(
-            &state.commands,
-            Message::CommandSelectionChanged,
-            15.,
-            5,
-            |theme: &Theme, _| iced_aw::style::selection_list::Style {
-                text_color: theme.palette().text,
-                background: theme.palette().background.into(),
-                ..Default::default()
-            },
-            None,
-            Font::DEFAULT
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-    ])
-    .padding(10)
-    .center(600)
-    .style(|theme: &Theme| container::Style {
-        background: Some(theme.palette().background.into()),
-        border: border::rounded(10),
-        ..container::Style::default()
-    });
+    let window: iced::widget::Container<'_, super::Message, Theme, iced::Renderer> =
+        container(column![
+            text_input("Command Menu", &state.query)
+                .on_input(Message::CommandPalatteQueryChanged)
+                .size(25),
+            container(results_list(
+                state.filtered_results.as_slice(),
+                state.selected_item.as_ref(),
+            ))
+            .width(Length::Fill)
+            .height(Length::Fill)
+        ])
+        .padding(10)
+        .center(600)
+        .style(|theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: border::rounded(10),
+            ..container::Style::default()
+        });
 
     stack![
         base.into(),
@@ -81,7 +91,7 @@ pub fn command_window<'a>(
                     ..container::Style::default()
                 }
             }))
-            .on_press(Message::HideOverlay)
+            .on_press(Message::HideOverlay),
         )
     ]
     .into()

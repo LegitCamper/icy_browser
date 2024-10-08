@@ -22,7 +22,7 @@ pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 
 pub mod command_window;
-pub use command_window::command_window;
+pub use command_window::{command_window, results_list, ResultType};
 
 use crate::{
     engines::BrowserEngine, shortcut::check_shortcut, to_url, Bookmark, Bookmarks, ImageInfo,
@@ -45,7 +45,7 @@ pub trait CustomWidget<Message> {
 // Options exist only to have defaults for EnumIter
 #[derive(Debug, Clone, PartialEq, Display, EnumIter)]
 pub enum Message {
-    // Commands
+    // Commands visible to user with shortcuts and command palatte
     #[strum(to_string = "Go Backward")]
     GoBackward,
     #[strum(to_string = "Go Forward")]
@@ -74,9 +74,8 @@ pub enum Message {
     Update,
     UrlChanged(String),
     UpdateUrl,
-    QueryChanged(String),
-    CommandSelectionChanged(usize, String),
-    CommandSelectionSelected,
+    CommandPalatteQueryChanged(String),
+    CommandPalatteSelected(String),
     SendKeyboardEvent(Option<keyboard::Event>),
     SendMouseEvent(Point, Option<mouse::Event>),
     UpdateViewSize(Size<u32>),
@@ -115,7 +114,7 @@ impl<Engine: BrowserEngine> Default for IcyBrowser<Engine> {
             engine: Engine::new(),
             home,
             nav_bar_state: None,
-            command_window_state: CommandWindowState::new(),
+            command_window_state: CommandWindowState::new(None),
             with_tab_bar: false,
             with_nav_bar: false,
             bookmarks: None,
@@ -151,6 +150,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
     pub fn with_bookmark_bar(mut self, bookmarks: &[Bookmark]) -> Self {
         self.bookmarks = Some(bookmarks.to_vec());
+        self.command_window_state = CommandWindowState::new(self.bookmarks.clone());
         self
     }
 
@@ -316,17 +316,14 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 }
                 Task::none()
             }
-            Message::QueryChanged(query) => {
+            Message::CommandPalatteQueryChanged(query) => {
                 self.command_window_state.query = query;
+                // self.command_window_state.filtered_results = self.command_window_state.possible_results.iter()
                 Task::none()
             }
-            Message::CommandSelectionChanged(index, name) => {
-                self.command_window_state.selected_index = index;
-                self.command_window_state.selected_action = name;
+            Message::CommandPalatteSelected(item) => {
+                self.command_window_state.selected_item = Some(item);
                 Task::none()
-            }
-            Message::CommandSelectionSelected => {
-                unimplemented!()
             }
             Message::ToggleOverlay => {
                 if self.show_overlay {
