@@ -22,7 +22,7 @@ pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 
 pub mod command_window;
-pub use command_window::{command_window, results_list, ResultType};
+pub use command_window::{command_window, ResultType, ResultsList};
 
 use crate::{
     engines::BrowserEngine, shortcut::check_shortcut, to_url, Bookmark, Bookmarks, ImageInfo,

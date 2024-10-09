@@ -5,7 +5,7 @@ use super::Message;
 use crate::Bookmark;
 
 mod results;
-pub use results::{results_list, ResultType};
+pub use results::{results_list, ResultType, ResultsList};
 
 pub struct CommandWindowState {
     pub query: String,
