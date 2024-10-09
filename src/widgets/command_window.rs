@@ -27,13 +27,13 @@ impl CommandWindowState {
                 Message::CloseCurrentTab,
             ]
             .into_iter()
-            .map(|msg| ResultType::Command(msg)),
+            .map(|msg| ResultType::Commands(msg)),
         );
         if let Some(bookmarks) = bookmarks {
             results.extend(
                 bookmarks
                     .into_iter()
-                    .map(|bookmark| ResultType::Bookmark(bookmark)),
+                    .map(|bookmark| ResultType::Bookmarks(bookmark)),
             );
         };
 
