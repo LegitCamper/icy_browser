@@ -328,7 +328,10 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                             .to_string()
                             .to_lowercase()
                             .contains(&query.to_lowercase())
-                            || command.inner_name().contains(&query.to_lowercase())
+                            || command
+                                .inner_name()
+                                .to_lowercase()
+                                .contains(&query.to_lowercase())
                     })
                     .collect();
                 Task::none()
