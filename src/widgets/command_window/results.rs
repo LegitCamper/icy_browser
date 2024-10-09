@@ -6,15 +6,15 @@ use super::super::{Bookmark, Message};
 
 #[derive(Clone, Display, PartialEq)]
 pub enum ResultType {
-    Command(Message),
-    Bookmark(Bookmark),
+    Commands(Message),
+    Bookmarks(Bookmark),
 }
 
 impl ResultType {
-    pub fn as_string(&self) -> String {
+    pub fn inner_name(&self) -> String {
         match self {
-            ResultType::Command(command) => command.to_string(),
-            ResultType::Bookmark(bookmark) => format!("Go to: {}", bookmark.url()),
+            ResultType::Commands(command) => command.to_string(),
+            ResultType::Bookmarks(bookmark) => format!("Go to: {}", bookmark.url()),
         }
     }
 }
@@ -32,8 +32,8 @@ pub fn results_list<'a>(
             list.push(text(result.to_string()).size(20).into())
         }
         let result_text = match result {
-            ResultType::Command(command) => command.to_string(),
-            ResultType::Bookmark(bookmark) => bookmark.to_string(),
+            ResultType::Commands(command) => command.to_string(),
+            ResultType::Bookmarks(bookmark) => bookmark.to_string(),
         };
 
         let mut text = text(format!("   {}", result_text)).size(15);

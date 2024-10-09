@@ -46,12 +46,12 @@ pub trait CustomWidget<Message> {
 #[derive(Debug, Clone, PartialEq, Display, EnumIter)]
 pub enum Message {
     // Commands visible to user with shortcuts and command palatte
-    #[strum(to_string = "Go Backward")]
+    #[strum(to_string = "Go Backward (Back)")]
     GoBackward,
-    #[strum(to_string = "Go Forward")]
+    #[strum(to_string = "Go Forward (Forward)")]
     GoForward,
     Refresh,
-    #[strum(to_string = "Go Home")]
+    #[strum(to_string = "Go Home (Home)")]
     GoHome,
     #[strum(to_string = "Go To Url")]
     GoToUrl(String),
@@ -317,8 +317,20 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 Task::none()
             }
             Message::CommandPalatteQueryChanged(query) => {
-                self.command_window_state.query = query;
-                // self.command_window_state.filtered_results = self.command_window_state.possible_results.iter()
+                self.command_window_state.query = query.clone();
+                self.command_window_state.filtered_results = self
+                    .command_window_state
+                    .possible_results
+                    .clone()
+                    .into_iter()
+                    .filter(|command| {
+                        command
+                            .to_string()
+                            .to_lowercase()
+                            .contains(&query.to_lowercase())
+                            || command.inner_name().contains(&query.to_lowercase())
+                    })
+                    .collect();
                 Task::none()
             }
             Message::CommandPalatteSelected(item) => {
