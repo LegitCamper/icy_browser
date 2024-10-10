@@ -42,14 +42,10 @@ impl CommandWindowState {
                 Message::CloseCurrentTab,
             ]
             .into_iter()
-            .map(|msg| ResultType::Commands(msg)),
+            .map(ResultType::Commands),
         );
         if let Some(bookmarks) = bookmarks {
-            results.extend(
-                bookmarks
-                    .into_iter()
-                    .map(|bookmark| ResultType::Bookmarks(bookmark)),
-            );
+            results.extend(bookmarks.into_iter().map(ResultType::Bookmarks));
         };
 
         Self {
@@ -65,9 +61,9 @@ impl CommandWindowState {
             None => {
                 self.selected_item = self
                     .filtered_results
-                    .get(0)
+                    .first()
                     .map(|res| res.inner_name())
-                    .or_else(|| None)
+                    .or(None)
             }
             Some(selected_item) => {
                 if let Some(last) = self.filtered_results.last() {
@@ -89,9 +85,9 @@ impl CommandWindowState {
             None => {
                 self.selected_item = self
                     .filtered_results
-                    .get(0)
+                    .first()
                     .map(|res| res.inner_name())
-                    .or_else(|| None)
+                    .or(None)
             }
             Some(selected_item) => {
                 if let Some(first) = self.filtered_results.first() {
@@ -162,10 +158,7 @@ pub fn command_palatte<'a>(
         .into()
 }
 
-fn results_list<'a>(
-    results: &'a [ResultType],
-    selected_item: Option<String>,
-) -> Element<'a, Message> {
+fn results_list<'a>(results: &[ResultType], selected_item: Option<String>) -> Element<'a, Message> {
     let mut list = Vec::new();
     let mut result_types = Vec::new();
 
