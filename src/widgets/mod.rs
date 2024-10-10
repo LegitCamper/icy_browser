@@ -22,7 +22,7 @@ pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 
 pub mod command_window;
-pub use command_window::{command_window, ResultType, ResultsList};
+pub use command_window::{command_palatte, ResultType};
 
 use crate::{
     engines::BrowserEngine, shortcut::check_shortcut, to_url, Bookmark, Bookmarks, ImageInfo,
@@ -75,7 +75,7 @@ pub enum Message {
     UrlChanged(String),
     UpdateUrl,
     CommandPalatteQueryChanged(String),
-    CommandPalatteSelected(String),
+    CommandPalatteKeyboardEvent(Option<keyboard::Event>),
     SendKeyboardEvent(Option<keyboard::Event>),
     SendMouseEvent(Point, Option<mouse::Event>),
     UpdateViewSize(Size<u32>),
@@ -336,9 +336,32 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                     .collect();
                 Task::none()
             }
-            Message::CommandPalatteSelected(item) => {
-                self.command_window_state.selected_item = Some(item);
-                Task::none()
+            Message::CommandPalatteKeyboardEvent(event) => {
+                if let Some(keyboard::Event::KeyPressed {
+                    key,
+                    modified_key: _,
+                    physical_key: _,
+                    location: _,
+                    modifiers: _,
+                    text: _,
+                }) = event
+                {
+                    match key {
+                        key::Key::Named(key::Named::ArrowDown) => {
+                            self.command_window_state.next_item();
+                            Task::none()
+                        }
+                        key::Key::Named(key::Named::ArrowUp) => {
+                            self.command_window_state.previous_item();
+                            Task::none()
+                        }
+                        // key::Key::Character(_) => todo!(),
+                        // key::Key::Unidentified => todo!(),
+                        _ => Task::none(),
+                    }
+                } else {
+                    Task::none()
+                }
             }
             Message::ToggleOverlay => {
                 if self.show_overlay {
@@ -421,7 +444,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
             !self.show_overlay,
         );
         if self.show_overlay {
-            column = column.push(command_window(browser_view, &self.command_window_state))
+            column = column.push(command_palatte(browser_view, &self.command_window_state))
         } else {
             column = column.push(browser_view);
         }

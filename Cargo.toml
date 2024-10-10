@@ -36,6 +36,7 @@ iced = { version = "0.13", features = ["advanced", "image", "tokio", "lazy"] }
 iced_aw = { version = "0.10", features = ["tab_bar", "selection_list"] }
 iced_fonts = { version = "0.1.1", features = ["bootstrap"] }
 iced_on_focus_widget = "0.1.1"
+iced_event_wrapper = { git = "https://github.com/LegitCamper/iced_event_wrapper" }
 rand = "0.8.5"
 reqwest = "0.12.5"
 serde = "1.0.207"
