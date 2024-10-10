@@ -1,60 +1,134 @@
 use iced::widget::{center, column, container, mouse_area, opaque, stack, text_input};
-use iced::{border, Color, Element, Font, Length, Theme};
-use iced_aw::SelectionList;
-use strum::IntoEnumIterator;
+use iced::widget::{scrollable, text, Column};
+use iced::{border, Color, Element, Length, Theme};
+use iced_event_wrapper::wrapper;
+use strum_macros::Display;
 
 use super::Message;
+use crate::Bookmark;
 
-// pub enum ResultType {
-//     Command(Message),
-//     // Bookmark,
-// }
+#[derive(Clone, Debug, Display, PartialEq)]
+pub enum ResultType {
+    Commands(Message),
+    Bookmarks(Bookmark),
+}
+
+impl ResultType {
+    pub fn inner_name(&self) -> String {
+        match self {
+            ResultType::Commands(command) => command.to_string(),
+            ResultType::Bookmarks(bookmark) => format!("Go to: {}", bookmark.url()),
+        }
+    }
+}
 
 pub struct CommandWindowState {
     pub query: String,
-    commands: Vec<String>,
-    pub selected_action: String,
-    pub selected_index: usize,
+    pub possible_results: Vec<ResultType>,
+    pub filtered_results: Vec<ResultType>,
+    pub selected_item: Option<String>,
 }
 
 impl CommandWindowState {
-    pub fn new() -> Self {
+    pub fn new(bookmarks: Option<Vec<Bookmark>>) -> Self {
+        let mut results: Vec<ResultType> = Vec::new();
+        // This may need to be extended in the future
+        results.extend(
+            vec![
+                Message::GoBackward,
+                Message::GoForward,
+                Message::Refresh,
+                Message::GoHome,
+                Message::CloseCurrentTab,
+            ]
+            .into_iter()
+            .map(ResultType::Commands),
+        );
+        if let Some(bookmarks) = bookmarks {
+            results.extend(bookmarks.into_iter().map(ResultType::Bookmarks));
+        };
+
         Self {
             query: String::new(),
-            commands: Message::iter().map(|e| e.clone().to_string()).collect(),
-            selected_action: String::new(),
-            selected_index: 0,
+            possible_results: results.clone(),
+            filtered_results: results,
+            selected_item: None,
+        }
+    }
+
+    pub fn next_item(&mut self) {
+        match &self.selected_item {
+            None => {
+                self.selected_item = self
+                    .filtered_results
+                    .first()
+                    .map(|res| res.inner_name())
+                    .or(None)
+            }
+            Some(selected_item) => {
+                if let Some(last) = self.filtered_results.last() {
+                    if *selected_item != last.inner_name() {
+                        if let Some(pos) = self
+                            .filtered_results
+                            .iter()
+                            .position(|res| res.inner_name() == *selected_item)
+                        {
+                            self.selected_item = Some(self.filtered_results[pos + 1].inner_name());
+                        } else {
+                            self.selected_item = None
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn previous_item(&mut self) {
+        match &self.selected_item {
+            None => {
+                self.selected_item = self
+                    .filtered_results
+                    .first()
+                    .map(|res| res.inner_name())
+                    .or(None)
+            }
+            Some(selected_item) => {
+                if let Some(first) = self.filtered_results.first() {
+                    if *selected_item != first.inner_name() {
+                        if let Some(pos) = self
+                            .filtered_results
+                            .iter()
+                            .position(|res| res.inner_name() == *selected_item)
+                        {
+                            self.selected_item = Some(self.filtered_results[pos - 1].inner_name());
+                        } else {
+                            self.selected_item = None;
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 impl Default for CommandWindowState {
     fn default() -> Self {
-        Self::new()
+        Self::new(None)
     }
 }
 
-pub fn command_window<'a>(
+pub fn command_palatte<'a>(
     base: impl Into<Element<'a, Message>>,
     state: &'a CommandWindowState,
 ) -> Element<'a, Message> {
     let window = container(column![
         text_input("Command Menu", &state.query)
-            .on_input(Message::QueryChanged)
+            .on_input(Message::CommandPalatteQueryChanged)
             .size(25),
-        SelectionList::new_with(
-            &state.commands,
-            Message::CommandSelectionChanged,
-            15.,
-            5,
-            |theme: &Theme, _| iced_aw::style::selection_list::Style {
-                text_color: theme.palette().text,
-                background: theme.palette().background.into(),
-                ..Default::default()
-            },
-            None,
-            Font::DEFAULT
-        )
+        container(results_list(
+            state.filtered_results.as_slice(),
+            state.selected_item.clone(),
+        ))
         .width(Length::Fill)
         .height(Length::Fill)
     ])
@@ -66,7 +140,7 @@ pub fn command_window<'a>(
         ..container::Style::default()
     });
 
-    stack![
+    let stack = stack![
         base.into(),
         opaque(
             mouse_area(center(opaque(window)).style(|_theme| {
@@ -81,8 +155,38 @@ pub fn command_window<'a>(
                     ..container::Style::default()
                 }
             }))
-            .on_press(Message::HideOverlay)
+            .on_press(Message::HideOverlay),
         )
-    ]
-    .into()
+    ];
+
+    wrapper(stack)
+        .on_keyboard_event(|event| Message::CommandPalatteKeyboardEvent(Some(event)))
+        .into()
+}
+
+fn results_list<'a>(results: &[ResultType], selected_item: Option<String>) -> Element<'a, Message> {
+    let mut list = Vec::new();
+    let mut result_types = Vec::new();
+
+    for result in results {
+        if !result_types.contains(&result.to_string()) {
+            result_types.push(result.to_string());
+            list.push(text(result.to_string()).size(20).into())
+        }
+
+        let mut text = container(text(format!("   {}", result.inner_name())).size(16));
+        if let Some(selected_item) = selected_item.as_ref() {
+            if result.inner_name() == *selected_item {
+                text = text.style(|theme: &Theme| {
+                    container::Style::default().background(theme.palette().primary)
+                })
+            }
+        }
+        list.push(text.into())
+    }
+
+    scrollable(Column::from_vec(list))
+        .width(Length::Fill)
+        .spacing(10)
+        .into()
 }

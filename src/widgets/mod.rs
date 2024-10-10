@@ -22,7 +22,7 @@ pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 
 pub mod command_window;
-pub use command_window::command_window;
+pub use command_window::{command_palatte, ResultType};
 
 use crate::{
     engines::BrowserEngine, shortcut::check_shortcut, to_url, Bookmark, Bookmarks, ImageInfo,
@@ -45,13 +45,13 @@ pub trait CustomWidget<Message> {
 // Options exist only to have defaults for EnumIter
 #[derive(Debug, Clone, PartialEq, Display, EnumIter)]
 pub enum Message {
-    // Commands
-    #[strum(to_string = "Go Backward")]
+    // Commands visible to user with shortcuts and command palatte
+    #[strum(to_string = "Go Backward (Back)")]
     GoBackward,
-    #[strum(to_string = "Go Forward")]
+    #[strum(to_string = "Go Forward (Forward)")]
     GoForward,
     Refresh,
-    #[strum(to_string = "Go Home")]
+    #[strum(to_string = "Go Home (Home)")]
     GoHome,
     #[strum(to_string = "Go To Url")]
     GoToUrl(String),
@@ -74,9 +74,8 @@ pub enum Message {
     Update,
     UrlChanged(String),
     UpdateUrl,
-    QueryChanged(String),
-    CommandSelectionChanged(usize, String),
-    CommandSelectionSelected,
+    CommandPalatteQueryChanged(String),
+    CommandPalatteKeyboardEvent(Option<keyboard::Event>),
     SendKeyboardEvent(Option<keyboard::Event>),
     SendMouseEvent(Point, Option<mouse::Event>),
     UpdateViewSize(Size<u32>),
@@ -115,7 +114,7 @@ impl<Engine: BrowserEngine> Default for IcyBrowser<Engine> {
             engine: Engine::new(),
             home,
             nav_bar_state: None,
-            command_window_state: CommandWindowState::new(),
+            command_window_state: CommandWindowState::new(None),
             with_tab_bar: false,
             with_nav_bar: false,
             bookmarks: None,
@@ -151,6 +150,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
     pub fn with_bookmark_bar(mut self, bookmarks: &[Bookmark]) -> Self {
         self.bookmarks = Some(bookmarks.to_vec());
+        self.command_window_state = CommandWindowState::new(self.bookmarks.clone());
         self
     }
 
@@ -316,17 +316,118 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 }
                 Task::none()
             }
-            Message::QueryChanged(query) => {
-                self.command_window_state.query = query;
+            Message::CommandPalatteQueryChanged(query) => {
+                self.command_window_state.query = query.clone();
+                self.command_window_state.filtered_results = self
+                    .command_window_state
+                    .possible_results
+                    .clone()
+                    .into_iter()
+                    .filter(|command| {
+                        command
+                            .to_string()
+                            .to_lowercase()
+                            .contains(&query.to_lowercase())
+                            || command
+                                .inner_name()
+                                .to_lowercase()
+                                .contains(&query.to_lowercase())
+                    })
+                    .collect();
                 Task::none()
             }
-            Message::CommandSelectionChanged(index, name) => {
-                self.command_window_state.selected_index = index;
-                self.command_window_state.selected_action = name;
-                Task::none()
-            }
-            Message::CommandSelectionSelected => {
-                unimplemented!()
+            Message::CommandPalatteKeyboardEvent(event) => {
+                if let Some(keyboard::Event::KeyPressed {
+                    key,
+                    modified_key: _,
+                    physical_key: _,
+                    location: _,
+                    modifiers: _,
+                    text: _,
+                }) = event
+                {
+                    match key {
+                        key::Key::Named(key::Named::Escape) => {
+                            self.command_window_state.query = String::new();
+                            self.command_window_state.filtered_results =
+                                self.command_window_state.possible_results.clone();
+                            self.command_window_state.selected_item = None;
+
+                            Task::done(Message::HideOverlay)
+                        }
+                        key::Key::Named(key::Named::ArrowDown) => {
+                            self.command_window_state.next_item();
+                            Task::none()
+                        }
+                        key::Key::Named(key::Named::ArrowUp) => {
+                            self.command_window_state.previous_item();
+                            Task::none()
+                        }
+                        key::Key::Named(key::Named::Backspace) => {
+                            self.command_window_state.next_item();
+                            if self.command_window_state.query.is_empty() {
+                                Task::none()
+                            } else {
+                                Task::done(Message::CommandPalatteQueryChanged(
+                                    self.command_window_state.query
+                                        [..self.command_window_state.query.len() - 1]
+                                        .to_string(),
+                                ))
+                            }
+                        }
+                        key::Key::Named(key::Named::Space) => {
+                            self.command_window_state.next_item();
+                            Task::done(Message::CommandPalatteQueryChanged(format!(
+                                "{} ",
+                                self.command_window_state.query
+                            )))
+                        }
+                        key::Key::Character(char) => {
+                            self.command_window_state.next_item();
+                            Task::done(Message::CommandPalatteQueryChanged(format!(
+                                "{}{}",
+                                self.command_window_state.query, char
+                            )))
+                        }
+                        key::Key::Named(key::Named::Enter) => {
+                            for result in &self.command_window_state.filtered_results {
+                                if let Some(selected_item) =
+                                    &self.command_window_state.selected_item
+                                {
+                                    if result.inner_name() == *selected_item {
+                                        let task = match result {
+                                            ResultType::Commands(message) => message.clone(),
+                                            ResultType::Bookmarks(bookmark) => {
+                                                Message::GoToUrl(bookmark.url().to_string())
+                                            }
+                                        };
+
+                                        self.command_window_state.query = String::new();
+                                        self.command_window_state.filtered_results =
+                                            self.command_window_state.possible_results.clone();
+                                        self.command_window_state.selected_item = None;
+
+                                        return Task::batch([
+                                            Task::done(task),
+                                            Task::done(Message::HideOverlay),
+                                        ]);
+                                    }
+                                }
+                            }
+                            // TODO: maybe make red to show none was selected
+                            self.command_window_state.query = String::new();
+                            self.command_window_state.filtered_results =
+                                self.command_window_state.possible_results.clone();
+                            self.command_window_state.selected_item = None;
+
+                            Task::done(Message::HideOverlay)
+                        }
+
+                        _ => Task::none(),
+                    }
+                } else {
+                    Task::none()
+                }
             }
             Message::ToggleOverlay => {
                 if self.show_overlay {
@@ -409,7 +510,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
             !self.show_overlay,
         );
         if self.show_overlay {
-            column = column.push(command_window(browser_view, &self.command_window_state))
+            column = column.push(command_palatte(browser_view, &self.command_window_state))
         } else {
             column = column.push(browser_view);
         }

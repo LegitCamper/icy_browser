@@ -8,7 +8,7 @@ pub use engines::{BrowserEngine, PixelFormat, Tab, TabInfo, Tabs};
 pub use engines::ultralight::Ultralight;
 
 pub mod widgets;
-pub use widgets::{browser_view, command_window, nav_bar, tab_bar, IcyBrowser, Message};
+pub use widgets::{browser_view, command_palatte, nav_bar, tab_bar, IcyBrowser, Message};
 
 mod helpers;
 pub use helpers::{get_fonts, to_url, Bookmark, Bookmarks, ImageInfo};

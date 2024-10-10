@@ -4,7 +4,7 @@ use iced::widget::{
     Button,
 };
 pub use iced_fonts::BOOTSTRAP_FONT_BYTES;
-use std::{borrow::Cow, str::FromStr};
+use std::{borrow::Cow, fmt, str::FromStr};
 use url::{ParseError, Url};
 
 use super::{Message, PixelFormat};
@@ -82,12 +82,13 @@ pub fn to_url(url: &str) -> Option<Url> {
 
 pub type Bookmarks = Vec<Bookmark>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Bookmark {
     url: Url,
     name: String,
     // icon: Optional<>
 }
+
 impl Bookmark {
     pub fn new(url: &str, name: &str) -> Self {
         Bookmark {
@@ -98,5 +99,19 @@ impl Bookmark {
 
     pub fn as_button(&self) -> Button<Message> {
         button(self.name.as_str()).on_press(Message::GoToUrl(self.url.to_string()))
+    }
+
+    pub fn url(&self) -> &Url {
+        &self.url
+    }
+
+    pub fn name(&self) -> &String {
+        &self.name
+    }
+}
+
+impl fmt::Display for Bookmark {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
     }
 }
