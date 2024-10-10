@@ -31,8 +31,8 @@ pub struct CommandWindowState {
 
 impl CommandWindowState {
     pub fn new(bookmarks: Option<Vec<Bookmark>>) -> Self {
-        // This may need to be extended in the future
         let mut results: Vec<ResultType> = Vec::new();
+        // This may need to be extended in the future
         results.extend(
             vec![
                 Message::GoBackward,
@@ -68,12 +68,15 @@ impl CommandWindowState {
             Some(selected_item) => {
                 if let Some(last) = self.filtered_results.last() {
                     if *selected_item != last.inner_name() {
-                        let pos = self
+                        if let Some(pos) = self
                             .filtered_results
                             .iter()
                             .position(|res| res.inner_name() == *selected_item)
-                            .unwrap();
-                        self.selected_item = Some(self.filtered_results[pos + 1].inner_name());
+                        {
+                            self.selected_item = Some(self.filtered_results[pos + 1].inner_name());
+                        } else {
+                            self.selected_item = None
+                        }
                     }
                 }
             }
@@ -92,12 +95,15 @@ impl CommandWindowState {
             Some(selected_item) => {
                 if let Some(first) = self.filtered_results.first() {
                     if *selected_item != first.inner_name() {
-                        let pos = self
+                        if let Some(pos) = self
                             .filtered_results
                             .iter()
                             .position(|res| res.inner_name() == *selected_item)
-                            .unwrap();
-                        self.selected_item = Some(self.filtered_results[pos - 1].inner_name());
+                        {
+                            self.selected_item = Some(self.filtered_results[pos - 1].inner_name());
+                        } else {
+                            self.selected_item = None;
+                        }
                     }
                 }
             }
@@ -168,12 +174,12 @@ fn results_list<'a>(results: &[ResultType], selected_item: Option<String>) -> El
             list.push(text(result.to_string()).size(20).into())
         }
 
-        let mut text = text(format!("   {}", result.inner_name())).size(15);
+        let mut text = container(text(format!("   {}", result.inner_name())).size(16));
         if let Some(selected_item) = selected_item.as_ref() {
             if result.inner_name() == *selected_item {
-                // highlight currently selected element
-                // text = text.color(iced::Color::new(50., 138., 176., 100.));
-                text = text.size(30)
+                text = text.style(|theme: &Theme| {
+                    container::Style::default().background(theme.palette().primary)
+                })
             }
         }
         list.push(text.into())

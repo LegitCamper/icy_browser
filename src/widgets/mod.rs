@@ -347,6 +347,14 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 }) = event
                 {
                     match key {
+                        key::Key::Named(key::Named::Escape) => {
+                            self.command_window_state.query = String::new();
+                            self.command_window_state.filtered_results =
+                                self.command_window_state.possible_results.clone();
+                            self.command_window_state.selected_item = None;
+
+                            Task::done(Message::HideOverlay)
+                        }
                         key::Key::Named(key::Named::ArrowDown) => {
                             self.command_window_state.next_item();
                             Task::none()
@@ -355,8 +363,66 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                             self.command_window_state.previous_item();
                             Task::none()
                         }
-                        // key::Key::Character(_) => todo!(),
-                        // key::Key::Unidentified => todo!(),
+                        key::Key::Named(key::Named::Backspace) => {
+                            self.command_window_state.next_item();
+                            if self.command_window_state.query.is_empty() {
+                                Task::none()
+                            } else {
+                                Task::done(Message::CommandPalatteQueryChanged(
+                                    self.command_window_state.query
+                                        [..self.command_window_state.query.len() - 1]
+                                        .to_string(),
+                                ))
+                            }
+                        }
+                        key::Key::Named(key::Named::Space) => {
+                            self.command_window_state.next_item();
+                            Task::done(Message::CommandPalatteQueryChanged(format!(
+                                "{} ",
+                                self.command_window_state.query
+                            )))
+                        }
+                        key::Key::Character(char) => {
+                            self.command_window_state.next_item();
+                            Task::done(Message::CommandPalatteQueryChanged(format!(
+                                "{}{}",
+                                self.command_window_state.query, char
+                            )))
+                        }
+                        key::Key::Named(key::Named::Enter) => {
+                            for result in &self.command_window_state.filtered_results {
+                                if let Some(selected_item) =
+                                    &self.command_window_state.selected_item
+                                {
+                                    if result.inner_name() == *selected_item {
+                                        let task = match result {
+                                            ResultType::Commands(message) => message.clone(),
+                                            ResultType::Bookmarks(bookmark) => {
+                                                Message::GoToUrl(bookmark.url().to_string())
+                                            }
+                                        };
+
+                                        self.command_window_state.query = String::new();
+                                        self.command_window_state.filtered_results =
+                                            self.command_window_state.possible_results.clone();
+                                        self.command_window_state.selected_item = None;
+
+                                        return Task::batch([
+                                            Task::done(task),
+                                            Task::done(Message::HideOverlay),
+                                        ]);
+                                    }
+                                }
+                            }
+                            // TODO: maybe make red to show none was selected
+                            self.command_window_state.query = String::new();
+                            self.command_window_state.filtered_results =
+                                self.command_window_state.possible_results.clone();
+                            self.command_window_state.selected_item = None;
+
+                            Task::done(Message::HideOverlay)
+                        }
+
                         _ => Task::none(),
                     }
                 } else {
