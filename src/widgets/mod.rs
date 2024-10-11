@@ -510,11 +510,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
             column = column.push(bookmark_bar(bookmarks))
         }
 
-        let browser_view = browser_view(
-            self.view_size,
-            self.engine.get_tabs().get_current().get_view(),
-            !self.show_overlay,
-        );
+        let browser_view = browser_view(self.engine.get_tabs().get_current().get_view());
         if self.show_overlay {
             column = column.push(command_palatte(browser_view, &self.command_window_state))
         } else {
