@@ -158,7 +158,6 @@ pub fn command_palatte<'a>(
     .padding(10)
     .center(600);
 
-    println!("has error: {}", state.has_error);
     if state.has_error {
         window = window.style(|theme: &Theme| container::Style {
             background: Some(theme.palette().background.into()),
