@@ -6,8 +6,8 @@ use iced::{Element, Settings, Subscription, Task};
 use std::time::Duration;
 
 use icy_browser::{
-    get_fonts, widgets, Bookmark, IcyBrowser, KeyType, Message as WidgetMessage, ShortcutBuilder,
-    ShortcutModifier, Ultralight,
+    get_fonts, widgets, Bookmark, IcyBrowser, KeyType, ShortcutBuilder, ShortcutModifier,
+    Ultralight,
 };
 
 fn main() -> iced::Result {
@@ -27,7 +27,7 @@ fn main() -> iced::Result {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    BrowserWidget(widgets::Message), // Passes messagees to Browser widgets
+    IcyBrowser(icy_browser::Message), // Passes messages to icy_browser
     Update,
     Event(Event),
 }
@@ -40,7 +40,7 @@ impl Default for Browser {
     fn default() -> Self {
         let shortcuts = ShortcutBuilder::new()
             .add_shortcut(
-                WidgetMessage::ToggleOverlay,
+                icy_browser::Message::ToggleOverlay,
                 vec![
                     KeyType::Modifier(ShortcutModifier::Ctrl),
                     KeyType::Key(iced::keyboard::Key::Character("e".into())),
@@ -69,17 +69,17 @@ impl Default for Browser {
 impl Browser {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::BrowserWidget(msg) => self.icy_browser.update(msg).map(Message::BrowserWidget),
-            Message::Update => self.icy_browser.force_update().map(Message::BrowserWidget),
+            Message::IcyBrowser(msg) => self.icy_browser.update(msg).map(Message::IcyBrowser),
+            Message::Update => self.icy_browser.force_update().map(Message::IcyBrowser),
             Message::Event(event) => self
                 .icy_browser
                 .update(widgets::Message::IcedEvent(Some(event)))
-                .map(Message::BrowserWidget),
+                .map(Message::IcyBrowser),
         }
     }
 
     fn view(&self) -> Element<Message> {
-        self.icy_browser.view().map(Message::BrowserWidget)
+        self.icy_browser.view().map(Message::IcyBrowser)
     }
 
     fn subscription(&self) -> Subscription<Message> {

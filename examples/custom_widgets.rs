@@ -22,7 +22,7 @@ fn main() -> iced::Result {
 
 #[derive(Debug, Clone)]
 pub enum Message {
-    BrowserWidget(widgets::Message), // Passes messagees to Browser widgets
+    IcyBrowser(widgets::Message),
     Update,
     Tick,
 }
@@ -61,8 +61,8 @@ impl Default for Browser {
 impl Browser {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::BrowserWidget(msg) => self.icy_browser.update(msg).map(Message::BrowserWidget),
-            Message::Update => self.icy_browser.force_update().map(Message::BrowserWidget),
+            Message::IcyBrowser(msg) => self.icy_browser.update(msg).map(Message::IcyBrowser),
+            Message::Update => self.icy_browser.force_update().map(Message::IcyBrowser),
             Message::Tick => Task::none(), // Tick
         }
     }
@@ -72,7 +72,7 @@ impl Browser {
         let color_index = (elapsed * 2.0) as usize % self.custom_widget_state.border_colors.len();
         let color = self.custom_widget_state.border_colors[color_index];
 
-        container(self.icy_browser.view().map(Message::BrowserWidget))
+        container(self.icy_browser.view().map(Message::IcyBrowser))
             .center_x(Length::Fill)
             .center_y(Length::Fill)
             .padding(20)
