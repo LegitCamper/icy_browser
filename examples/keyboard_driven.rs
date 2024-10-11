@@ -50,7 +50,7 @@ impl Default for Browser {
         let widgets = IcyBrowser::new()
             .with_custom_shortcuts(shortcuts)
             .with_tab_bar()
-            .with_bookmark_bar(&[
+            .bookmarks(&[
                 Bookmark::new("https://www.rust-lang.org", "rust-lang.org"),
                 Bookmark::new(
                     "https://github.com/LegitCamper/icy_browser",
@@ -58,6 +58,7 @@ impl Default for Browser {
                 ),
                 Bookmark::new("https://docs.rs/iced/latest/iced/", "iced docs"),
             ])
+            .with_bookmark_bar()
             .build();
 
         Self {

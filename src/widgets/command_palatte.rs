@@ -17,7 +17,7 @@ impl ResultType {
     pub fn inner_name(&self) -> String {
         match self {
             ResultType::Commands(command) => command.to_string(),
-            ResultType::Bookmarks(bookmark) => format!("Go to: {}", bookmark.url()),
+            ResultType::Bookmarks(bookmark) => format!("{} -> {}", bookmark.name(), bookmark.url()),
         }
     }
 }
@@ -40,6 +40,17 @@ impl CommandWindowState {
                 Message::Refresh,
                 Message::GoHome,
                 Message::CloseCurrentTab,
+                Message::CreateTab,
+                Message::HideOverlay,
+                Message::ToggleTabBar,
+                Message::ShowTabBar,
+                Message::HideTabBar,
+                Message::ToggleNavBar,
+                Message::ShowNavBar,
+                Message::HideNavBar,
+                Message::ToggleBookmarkBar,
+                Message::ShowBookmarkBar,
+                Message::HideBookmarkBar,
             ]
             .into_iter()
             .map(ResultType::Commands),

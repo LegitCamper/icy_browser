@@ -30,7 +30,8 @@ fn run() -> (IcyBrowser<Ultralight>, Task<Message>) {
         IcyBrowser::new()
             .with_tab_bar()
             .with_nav_bar()
-            .with_bookmark_bar(&[Bookmark::new("https://www.rust-lang.org", "rust-lang.org")])
+            .bookmarks(&[Bookmark::new("https://www.rust-lang.org", "rust-lang.org")])
+            .with_bookmark_bar()
             .build(),
         Task::none(),
     )

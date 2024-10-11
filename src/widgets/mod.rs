@@ -67,6 +67,24 @@ pub enum Message {
     ShowOverlay,
     #[strum(to_string = "Hide Command Palatte")]
     HideOverlay,
+    #[strum(to_string = "Toggle Tab Bar")]
+    ToggleTabBar,
+    #[strum(to_string = "Show Tab Bar")]
+    ShowTabBar,
+    #[strum(to_string = "Hide Tab Bar")]
+    HideTabBar,
+    #[strum(to_string = "Toggle Nav Bar")]
+    ToggleNavBar,
+    #[strum(to_string = "Show Nav Bar")]
+    ShowNavBar,
+    #[strum(to_string = "Hide Nav Bar")]
+    HideNavBar,
+    #[strum(to_string = "Toggle Bookmark Bar")]
+    ToggleBookmarkBar,
+    #[strum(to_string = "Show Bookmark Bar")]
+    ShowBookmarkBar,
+    #[strum(to_string = "Hide Bookmark Bar")]
+    HideBookmarkBar,
 
     // Internal only - for widgets
     Update,
@@ -95,10 +113,11 @@ impl Default for TabSelectionType {
 pub struct IcyBrowser<Engine: BrowserEngine> {
     engine: Engine,
     home: Url,
-    nav_bar_state: Option<NavBarState>,
+    nav_bar_state: NavBarState,
     command_window_state: CommandWindowState,
     with_tab_bar: bool,
     with_nav_bar: bool,
+    with_bookmark_bar: bool,
     bookmarks: Option<Bookmarks>,
     show_overlay: bool,
     shortcuts: Shortcuts,
@@ -111,10 +130,11 @@ impl<Engine: BrowserEngine> Default for IcyBrowser<Engine> {
         Self {
             engine: Engine::new(),
             home,
-            nav_bar_state: None,
+            nav_bar_state: NavBarState::new(),
             command_window_state: CommandWindowState::new(None),
             with_tab_bar: false,
             with_nav_bar: false,
+            with_bookmark_bar: false,
             bookmarks: None,
             show_overlay: false,
             shortcuts: Shortcuts::default(),
@@ -142,13 +162,18 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
     pub fn with_nav_bar(mut self) -> Self {
         self.with_nav_bar = true;
-        self.nav_bar_state = Some(NavBarState::new());
+        self.nav_bar_state = NavBarState::new();
         self
     }
 
-    pub fn with_bookmark_bar(mut self, bookmarks: &[Bookmark]) -> Self {
+    pub fn bookmarks(mut self, bookmarks: &[Bookmark]) -> Self {
         self.bookmarks = Some(bookmarks.to_vec());
         self.command_window_state = CommandWindowState::new(self.bookmarks.clone());
+        self
+    }
+
+    pub fn with_bookmark_bar(mut self) -> Self {
+        self.with_bookmark_bar = true;
         self
     }
 
@@ -235,9 +260,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                     TabSelectionType::Index(index) => self.engine.get_tabs().index_to_id(index),
                 };
                 self.engine.get_tabs_mut().set_current_id(id);
-                if let Some(state) = self.nav_bar_state.as_mut() {
-                    state.0 = self.engine.get_tabs().get_current().url();
-                }
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::CloseCurrentTab => Task::done(Message::CloseTab(TabSelectionType::Id(
@@ -254,15 +277,11 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                     TabSelectionType::Index(index) => self.engine.get_tabs().index_to_id(index),
                 };
                 self.engine.get_tabs_mut().remove(id);
-                if let Some(state) = self.nav_bar_state.as_mut() {
-                    state.0 = self.engine.get_tabs().get_current().url();
-                }
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::CreateTab => {
-                if let Some(state) = self.nav_bar_state.as_mut() {
-                    state.0 = self.home.to_string();
-                }
+                self.nav_bar_state.0 = self.home.to_string();
                 let home = self.home.clone();
                 let bounds = self.view_size;
                 let tab = self.engine.new_tab(
@@ -278,16 +297,12 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
             }
             Message::GoBackward => {
                 self.engine.go_back();
-                if let Some(state) = self.nav_bar_state.as_mut() {
-                    state.0 = self.engine.get_tabs().get_current().url();
-                }
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::GoForward => {
                 self.engine.go_forward();
-                if let Some(state) = self.nav_bar_state.as_mut() {
-                    state.0 = self.engine.get_tabs().get_current().url();
-                }
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::Refresh => {
@@ -303,15 +318,59 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 Task::none()
             }
             Message::UpdateUrl => {
-                if let Some(state) = self.nav_bar_state.as_mut() {
-                    state.0 = self.engine.get_tabs().get_current().url();
-                }
+                self.nav_bar_state.0 = self.engine.get_tabs().get_current().url();
                 Task::none()
             }
             Message::UrlChanged(url) => {
-                if let Some(state) = self.nav_bar_state.as_mut() {
-                    state.0 = url;
+                self.nav_bar_state.0 = url;
+                Task::none()
+            }
+            Message::ToggleTabBar => {
+                if self.with_tab_bar {
+                    self.with_tab_bar = false;
+                } else {
+                    self.with_tab_bar = true;
                 }
+                Task::none()
+            }
+            Message::ShowTabBar => {
+                self.with_tab_bar = true;
+                Task::none()
+            }
+            Message::HideTabBar => {
+                self.with_tab_bar = false;
+                Task::none()
+            }
+            Message::ToggleNavBar => {
+                if self.with_nav_bar {
+                    self.with_nav_bar = false;
+                } else {
+                    self.with_nav_bar = true;
+                }
+                Task::none()
+            }
+            Message::ShowNavBar => {
+                self.with_nav_bar = true;
+                Task::none()
+            }
+            Message::HideNavBar => {
+                self.with_nav_bar = false;
+                Task::none()
+            }
+            Message::ToggleBookmarkBar => {
+                if self.with_bookmark_bar {
+                    self.with_bookmark_bar = false;
+                } else {
+                    self.with_bookmark_bar = true;
+                }
+                Task::none()
+            }
+            Message::ShowBookmarkBar => {
+                self.with_bookmark_bar = true;
+                Task::none()
+            }
+            Message::HideBookmarkBar => {
+                self.with_bookmark_bar = false;
                 Task::none()
             }
             Message::CommandPalatteQueryChanged(query) => {
@@ -501,13 +560,13 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
             column = column.push(tab_bar(self.engine.get_tabs()))
         }
         if self.with_nav_bar {
-            column = column.push(
-                hoverable(nav_bar(self.nav_bar_state.as_ref().unwrap()))
-                    .on_focus_change(Message::UpdateUrl),
-            )
+            column = column
+                .push(hoverable(nav_bar(&self.nav_bar_state)).on_focus_change(Message::UpdateUrl))
         }
-        if let Some(bookmarks) = self.bookmarks.as_ref() {
-            column = column.push(bookmark_bar(bookmarks))
+        if self.with_bookmark_bar {
+            if let Some(bookmarks) = self.bookmarks.as_ref() {
+                column = column.push(bookmark_bar(bookmarks))
+            }
         }
 
         let browser_view = browser_view(self.engine.get_tabs().get_current().get_view());

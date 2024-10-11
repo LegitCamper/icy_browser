@@ -874,7 +874,7 @@ fn iced_key_to_ultralight_key(
                         #[cfg(windows)]
                         189,
                         #[cfg(unix)]
-                        12,
+                        74,
                     ),
                     "+" => (
                         VirtualKeyCode::OemPlus,
