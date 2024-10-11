@@ -326,11 +326,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 Task::none()
             }
             Message::ToggleTabBar => {
-                if self.with_tab_bar {
-                    self.with_tab_bar = false;
-                } else {
-                    self.with_tab_bar = true;
-                }
+                self.with_tab_bar = !self.with_tab_bar;
                 Task::none()
             }
             Message::ShowTabBar => {
@@ -342,11 +338,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 Task::none()
             }
             Message::ToggleNavBar => {
-                if self.with_nav_bar {
-                    self.with_nav_bar = false;
-                } else {
-                    self.with_nav_bar = true;
-                }
+                self.with_nav_bar = !self.with_nav_bar;
                 Task::none()
             }
             Message::ShowNavBar => {
@@ -358,11 +350,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 Task::none()
             }
             Message::ToggleBookmarkBar => {
-                if self.with_bookmark_bar {
-                    self.with_bookmark_bar = false;
-                } else {
-                    self.with_bookmark_bar = true;
-                }
+                self.with_bookmark_bar = !self.with_bookmark_bar;
                 Task::none()
             }
             Message::ShowBookmarkBar => {
@@ -375,9 +363,18 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
             }
             Message::CommandPalatteQueryChanged(query) => {
                 self.command_window_state.query = query.clone();
+                self.command_window_state.filtered_results =
+                    self.command_window_state.possible_results.clone();
+
+                if let Some(url) = to_url(query.as_str()) {
+                    self.command_window_state
+                        .filtered_results
+                        .push(ResultType::Url(url.to_string()));
+                }
+
                 self.command_window_state.filtered_results = self
                     .command_window_state
-                    .possible_results
+                    .filtered_results
                     .clone()
                     .into_iter()
                     .filter(|command| {
@@ -390,7 +387,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                 .to_lowercase()
                                 .contains(&query.to_lowercase())
                     })
-                    .collect();
+                    .collect::<Vec<_>>();
                 Task::none()
             }
             Message::CommandPalatteKeyboardEvent(event) => {
@@ -413,11 +410,8 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                     }
                     match key {
                         key::Key::Named(key::Named::Escape) => {
-                            self.command_window_state.query = String::new();
-                            self.command_window_state.filtered_results =
-                                self.command_window_state.possible_results.clone();
-                            self.command_window_state.selected_item = None;
-
+                            self.command_window_state =
+                                CommandWindowState::new(self.bookmarks.clone());
                             Task::done(Message::HideOverlay)
                         }
                         key::Key::Named(key::Named::ArrowDown) => {
@@ -429,6 +423,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                             Task::none()
                         }
                         key::Key::Named(key::Named::Backspace) => {
+                            self.command_window_state.has_error = false;
                             self.command_window_state.first_item();
                             if self.command_window_state.query.is_empty() {
                                 Task::none()
@@ -441,6 +436,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                             }
                         }
                         key::Key::Named(key::Named::Space) => {
+                            self.command_window_state.has_error = false;
                             self.command_window_state.first_item();
                             Task::done(Message::CommandPalatteQueryChanged(format!(
                                 "{} ",
@@ -448,6 +444,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                             )))
                         }
                         key::Key::Character(char) => {
+                            self.command_window_state.has_error = false;
                             self.command_window_state.first_item();
                             Task::done(Message::CommandPalatteQueryChanged(format!(
                                 "{}{}",
@@ -465,12 +462,13 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                             ResultType::Bookmarks(bookmark) => {
                                                 Message::GoToUrl(bookmark.url().to_string())
                                             }
+                                            ResultType::Url(url) => {
+                                                Message::GoToUrl(url.to_string())
+                                            }
                                         };
 
-                                        self.command_window_state.query = String::new();
-                                        self.command_window_state.filtered_results =
-                                            self.command_window_state.possible_results.clone();
-                                        self.command_window_state.selected_item = None;
+                                        self.command_window_state =
+                                            CommandWindowState::new(self.bookmarks.clone());
 
                                         return Task::batch([
                                             Task::done(task),
@@ -479,13 +477,9 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                     }
                                 }
                             }
-                            // TODO: maybe make red to show none was selected
-                            self.command_window_state.query = String::new();
-                            self.command_window_state.filtered_results =
-                                self.command_window_state.possible_results.clone();
-                            self.command_window_state.selected_item = None;
 
-                            Task::done(Message::HideOverlay)
+                            self.command_window_state.has_error = true;
+                            Task::none()
                         }
 
                         _ => Task::none(),

@@ -1,6 +1,6 @@
 use iced::widget::{center, column, container, mouse_area, opaque, stack, text_input};
 use iced::widget::{scrollable, text, Column};
-use iced::{border, Color, Element, Length, Theme};
+use iced::{border, Color, Element, Length, Shadow, Theme};
 use iced_event_wrapper::wrapper;
 use strum_macros::Display;
 
@@ -11,6 +11,7 @@ use crate::Bookmark;
 pub enum ResultType {
     Commands(Message),
     Bookmarks(Bookmark),
+    Url(String),
 }
 
 impl ResultType {
@@ -18,6 +19,7 @@ impl ResultType {
         match self {
             ResultType::Commands(command) => command.to_string(),
             ResultType::Bookmarks(bookmark) => format!("{} -> {}", bookmark.name(), bookmark.url()),
+            ResultType::Url(url) => url.to_string(),
         }
     }
 }
@@ -27,6 +29,7 @@ pub struct CommandWindowState {
     pub possible_results: Vec<ResultType>,
     pub filtered_results: Vec<ResultType>,
     pub selected_item: Option<String>,
+    pub has_error: bool,
 }
 
 impl CommandWindowState {
@@ -64,6 +67,7 @@ impl CommandWindowState {
             possible_results: results.clone(),
             filtered_results: results,
             selected_item: None,
+            has_error: false,
         }
     }
 
@@ -140,7 +144,7 @@ pub fn command_palatte<'a>(
     base: impl Into<Element<'a, Message>>,
     state: &'a CommandWindowState,
 ) -> Element<'a, Message> {
-    let window = container(column![
+    let mut window = container(column![
         text_input("Command Palatte", &state.query)
             .on_input(Message::CommandPalatteQueryChanged)
             .size(25),
@@ -152,12 +156,32 @@ pub fn command_palatte<'a>(
         .height(Length::Fill)
     ])
     .padding(10)
-    .center(600)
-    .style(|theme: &Theme| container::Style {
-        background: Some(theme.palette().background.into()),
-        border: border::rounded(10),
-        ..container::Style::default()
-    });
+    .center(600);
+
+    println!("has error: {}", state.has_error);
+    if state.has_error {
+        window = window.style(|theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: border::rounded(10),
+            shadow: Shadow {
+                color: Color {
+                    r: 255.,
+                    g: 0.,
+                    b: 0.,
+                    a: 0.,
+                },
+                blur_radius: 10.,
+                ..Default::default()
+            },
+            ..container::Style::default()
+        });
+    } else {
+        window = window.style(|theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: border::rounded(10),
+            ..container::Style::default()
+        });
+    }
 
     let stack = stack![
         base.into(),
