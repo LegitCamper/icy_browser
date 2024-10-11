@@ -18,6 +18,7 @@
 
 ### Examples
 #### basic_browser.rs
+`cargo run --example basic_browser --features ultralight-resources`
 <img src="https://github.com/LegitCamper/icy_browser/blob/main/assets/basic_browser.png?raw=true" width=50%>
 
 ``` Rust

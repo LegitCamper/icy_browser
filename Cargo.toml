@@ -23,8 +23,7 @@ opt-level = "s"
 lto = "thin"
 
 [features]
-default = ["webkit", "native-tls", "ultralight-resources"]
-webkit = ["ultralight"]
+default = ["ultralight", "native-tls"]
 ultralight = ["ul-next"]
 ultralight-resources = []
 native-tls = ["reqwest/native-tls"]

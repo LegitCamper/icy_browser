@@ -1,11 +1,15 @@
+#[cfg(feature = "ultralight-resources")]
 use std::env::var;
+#[cfg(feature = "ultralight-resources")]
 use std::fs::{self, DirEntry};
+#[cfg(feature = "ultralight-resources")]
 use std::path::Path;
 
 fn main() {
     // ensure runtime resources exist - for examples & local tests
     #[cfg(feature = "ultralight-resources")]
     {
+        let mut possible_directories = Vec::new();
         let out = var("OUT_DIR").unwrap();
         // This allows it to work in this project but also other projects too
         let path = Path::new(&out)
@@ -19,8 +23,6 @@ fn main() {
             .unwrap()
             .parent()
             .unwrap();
-
-        let mut possible_directories = Vec::new();
 
         let target = Path::new(path).join("target");
         let debug_path = target.clone().join("debug");
@@ -78,6 +80,7 @@ fn main() {
     println!("cargo:rerun-if-changed=Cargo.lock");
 }
 
+#[cfg(feature = "ultralight-resources")]
 fn get_paths(possible_paths: &mut Vec<fs::DirEntry>, path_str: String) {
     let mut paths: Vec<DirEntry> = fs::read_dir(path_str)
         .expect("Could not read dir")

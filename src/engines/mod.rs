@@ -8,7 +8,7 @@ use url::Url;
 
 use crate::ImageInfo;
 
-#[cfg(feature = "webkit")]
+#[cfg(feature = "ultralight")]
 pub mod ultralight;
 
 pub enum PixelFormat {
