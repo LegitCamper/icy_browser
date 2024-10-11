@@ -56,6 +56,14 @@ impl CommandWindowState {
         }
     }
 
+    pub fn first_item(&mut self) {
+        self.selected_item = self
+            .filtered_results
+            .first()
+            .map(|res| res.inner_name())
+            .or(None)
+    }
+
     pub fn next_item(&mut self) {
         match &self.selected_item {
             None => {
@@ -122,7 +130,7 @@ pub fn command_palatte<'a>(
     state: &'a CommandWindowState,
 ) -> Element<'a, Message> {
     let window = container(column![
-        text_input("Command Menu", &state.query)
+        text_input("Command Palatte", &state.query)
             .on_input(Message::CommandPalatteQueryChanged)
             .size(25),
         container(results_list(

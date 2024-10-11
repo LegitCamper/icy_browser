@@ -14,4 +14,6 @@ mod helpers;
 pub use helpers::{get_fonts, to_url, Bookmark, Bookmarks, ImageInfo};
 
 mod shortcut;
-pub use shortcut::{KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts};
+pub use shortcut::{
+    shortcut_pressed, KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts,
+};

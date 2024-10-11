@@ -82,7 +82,7 @@ pub type Shortcut = (Message, Vec<KeyType>);
 /// Configures Widget Keyboard Shortcuts
 pub type Shortcuts = Vec<Shortcut>;
 
-pub fn check_shortcut(shortcut: &Shortcut, key: &Key, modifiers: &Modifiers) -> bool {
+pub fn shortcut_pressed(shortcut: &Shortcut, key: &Key, modifiers: &Modifiers) -> bool {
     shortcut
         .1
         .iter()

@@ -1,4 +1,3 @@
-use command_window::CommandWindowState;
 use iced::keyboard::{self, key};
 use iced::widget::{self, column};
 use iced::{mouse, Element, Event, Point, Size, Subscription, Task};
@@ -21,12 +20,11 @@ pub use tab_bar::tab_bar;
 pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 
-pub mod command_window;
-pub use command_window::{command_palatte, ResultType};
+pub mod command_palatte;
+pub use command_palatte::{command_palatte, CommandWindowState, ResultType};
 
 use crate::{
-    engines::BrowserEngine, shortcut::check_shortcut, to_url, Bookmark, Bookmarks, ImageInfo,
-    Shortcuts,
+    engines::BrowserEngine, shortcut_pressed, to_url, Bookmark, Bookmarks, ImageInfo, Shortcuts,
 };
 
 /// Allows users to implement their own custom view view with custom widgets and configurations
@@ -342,10 +340,18 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                     modified_key: _,
                     physical_key: _,
                     location: _,
-                    modifiers: _,
+                    modifiers,
                     text: _,
                 }) = event
                 {
+                    // use user shortcut to close command window
+                    for shortcut in self.shortcuts.iter().filter(|shortcut| {
+                        shortcut.0 == Message::HideOverlay || shortcut.0 == Message::ToggleOverlay
+                    }) {
+                        if shortcut_pressed(shortcut, &key, &modifiers) {
+                            return Task::done(Message::HideOverlay);
+                        }
+                    }
                     match key {
                         key::Key::Named(key::Named::Escape) => {
                             self.command_window_state.query = String::new();
@@ -364,7 +370,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                             Task::none()
                         }
                         key::Key::Named(key::Named::Backspace) => {
-                            self.command_window_state.next_item();
+                            self.command_window_state.first_item();
                             if self.command_window_state.query.is_empty() {
                                 Task::none()
                             } else {
@@ -376,14 +382,14 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                             }
                         }
                         key::Key::Named(key::Named::Space) => {
-                            self.command_window_state.next_item();
+                            self.command_window_state.first_item();
                             Task::done(Message::CommandPalatteQueryChanged(format!(
                                 "{} ",
                                 self.command_window_state.query
                             )))
                         }
                         key::Key::Character(char) => {
-                            self.command_window_state.next_item();
+                            self.command_window_state.first_item();
                             Task::done(Message::CommandPalatteQueryChanged(format!(
                                 "{}{}",
                                 self.command_window_state.query, char
@@ -470,7 +476,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
                             // Shortcut (Customizable) behaviors
                             for shortcut in self.shortcuts.iter() {
-                                if check_shortcut(shortcut, &key, &modifiers) {
+                                if shortcut_pressed(shortcut, &key, &modifiers) {
                                     return Task::done(shortcut.0.clone());
                                 }
                             }
