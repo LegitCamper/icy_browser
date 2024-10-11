@@ -33,6 +33,7 @@ pub trait BrowserEngine {
     fn get_cursor(&self) -> Interaction;
     // fn get_icon(&self) -> Image<Handle>;
     fn goto_url(&self, url: &Url);
+    fn goto_html(&self, html: String);
     fn has_loaded(&self) -> bool;
     fn new_tab(&mut self, url: Url, size: Size<u32>) -> Tab<Self::Info>;
     fn get_tabs(&self) -> &Tabs<Self::Info>;

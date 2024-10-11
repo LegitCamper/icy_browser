@@ -144,6 +144,10 @@ impl BrowserEngine for Ultralight {
         *self.tabs.get_current().info.cursor.read().unwrap()
     }
 
+    fn goto_html(&self, html: String) {
+        self.tabs.get_current().info.view.load_html(&html).unwrap();
+    }
+
     fn goto_url(&self, url: &Url) {
         self.tabs
             .get_current()
