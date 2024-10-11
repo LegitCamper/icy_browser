@@ -111,10 +111,10 @@ impl Default for TabSelectionType {
 }
 
 /// Allows the user to write a custom homepage
-pub enum HomepageType {
-    Url(String),
+pub enum HomepageType<'a> {
+    Url(&'a str),
     /// This is rendered with html
-    Custom(String),
+    Custom(&'a str),
 }
 
 pub struct IcyBrowser<Engine: BrowserEngine> {
@@ -160,7 +160,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
     pub fn with_homepage(mut self, homepage: HomepageType) -> Self {
         match homepage {
             HomepageType::Url(url) => {
-                self.home = Url::parse(&url).expect("Failed to parse homepage as a url!");
+                self.home = Url::parse(url).expect("Failed to parse homepage as a url!");
             }
             HomepageType::Custom(_) => todo!(),
         }
