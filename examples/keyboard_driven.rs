@@ -46,6 +46,13 @@ impl Default for Browser {
                     KeyType::Key(iced::keyboard::Key::Character("e".into())),
                 ],
             )
+            .add_shortcut(
+                icy_browser::Message::CreateTab,
+                vec![
+                    KeyType::Modifier(ShortcutModifier::Ctrl),
+                    KeyType::Key(iced::keyboard::Key::Character("t".into())),
+                ],
+            )
             .build();
         let widgets = IcyBrowser::new()
             .with_custom_shortcuts(shortcuts)

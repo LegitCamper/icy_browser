@@ -26,10 +26,11 @@ pub use command_palatte::{command_palatte, CommandPalatteState, ResultType};
 
 use crate::{
     engines::BrowserEngine, shortcut_pressed, to_url, Bookmark, Bookmarks, ImageInfo, Shortcuts,
+    TabInfo, TabSelectionType,
 };
 
 /// Allows users to implement their own custom view view with custom widgets and configurations
-pub trait CustomWidget<Message> {
+pub trait CustomWidget<Message, Info: TabInfo + Clone> {
     fn update(&mut self, message: Message);
     fn view(
         &self,
@@ -97,18 +98,6 @@ pub enum Message {
     SendMouseEvent(Point, Option<mouse::Event>),
     UpdateViewSize(Size<u32>),
     IcedEvent(Option<iced::Event>),
-}
-
-/// Allows different widgets to interact in their native way
-#[derive(Debug, Clone, PartialEq)]
-pub enum TabSelectionType {
-    Id(u32),
-    Index(usize),
-}
-impl Default for TabSelectionType {
-    fn default() -> Self {
-        TabSelectionType::Index(0)
-    }
 }
 
 /// Allows the user to write a custom homepage
@@ -381,6 +370,12 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 self.command_palatte_state.filtered_results =
                     self.command_palatte_state.possible_results.clone();
 
+                for tab in self.engine().get_tabs().display_tabs() {
+                    self.command_palatte_state
+                        .filtered_results
+                        .push(ResultType::Tab(tab));
+                }
+
                 if let Some(url) = to_url(query.as_str()) {
                     self.command_palatte_state
                         .filtered_results
@@ -484,12 +479,15 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                 {
                                     if result.inner_name() == *selected_item {
                                         let task = match result {
-                                            ResultType::Commands(message) => message.clone(),
-                                            ResultType::Bookmarks(bookmark) => {
+                                            ResultType::Command(message) => message.clone(),
+                                            ResultType::Bookmark(bookmark) => {
                                                 Message::GoToUrl(bookmark.url().to_string())
                                             }
                                             ResultType::Url(url) => {
                                                 Message::GoToUrl(url.to_string())
+                                            }
+                                            ResultType::Tab(tab) => {
+                                                Message::ChangeTab(TabSelectionType::Id(tab.id))
                                             }
                                         };
 

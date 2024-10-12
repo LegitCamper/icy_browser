@@ -4,22 +4,27 @@ use iced::{border, Color, Element, Length, Shadow, Theme};
 use iced_event_wrapper::wrapper;
 use strum_macros::Display;
 
-use super::Message;
-use crate::Bookmark;
+use crate::engines::DisplayTab;
+use crate::{Bookmark, Message};
 
 #[derive(Clone, Debug, Display, PartialEq)]
 pub enum ResultType {
-    Commands(Message),
-    Bookmarks(Bookmark),
+    #[strum(to_string = "Commands")]
+    Command(Message),
+    #[strum(to_string = "Bookmarks")]
+    Bookmark(Bookmark),
+    #[strum(to_string = "Tabs")]
+    Tab(DisplayTab),
     Url(String),
 }
 
 impl ResultType {
     pub fn inner_name(&self) -> String {
         match self {
-            ResultType::Commands(command) => command.to_string(),
-            ResultType::Bookmarks(bookmark) => format!("{} -> {}", bookmark.name(), bookmark.url()),
+            ResultType::Command(command) => command.to_string(),
+            ResultType::Bookmark(bookmark) => format!("{} -> {}", bookmark.name(), bookmark.url()),
             ResultType::Url(url) => url.to_string(),
+            ResultType::Tab(tab) => format!("{} -> {}", tab.title, tab.url),
         }
     }
 }
@@ -56,10 +61,10 @@ impl CommandPalatteState {
                 Message::HideBookmarkBar,
             ]
             .into_iter()
-            .map(ResultType::Commands),
+            .map(ResultType::Command),
         );
         if let Some(bookmarks) = bookmarks {
-            results.extend(bookmarks.into_iter().map(ResultType::Bookmarks));
+            results.extend(bookmarks.into_iter().map(ResultType::Bookmark));
         };
 
         Self {

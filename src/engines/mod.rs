@@ -56,9 +56,25 @@ pub trait TabInfo {
     fn title(&self) -> String;
 }
 
+/// Can be converted from Tab to hold information for ResultType
+#[derive(Clone, Debug, PartialEq)]
+pub struct DisplayTab {
+    pub id: u32,
+    pub url: String,
+    pub title: String,
+}
+
+impl<Info: TabInfo> From<Tab<Info>> for DisplayTab {
+    fn from(tab: Tab<Info>) -> Self {
+        DisplayTab {
+            id: tab.id,
+            url: tab.url(),
+            title: tab.title(),
+        }
+    }
+}
+
 /// Stores Tab info like url & title
-// Some browser engines take a closure to the url and title
-// to automatically update it when it changes
 pub struct Tab<Info: TabInfo> {
     id: u32,
     view: ImageInfo,
@@ -72,6 +88,14 @@ impl<Info: TabInfo> Tab<Info> {
             id,
             view: ImageInfo::default(),
             info,
+        }
+    }
+
+    pub fn to_display_tab(&self) -> DisplayTab {
+        DisplayTab {
+            id: self.id,
+            url: self.url(),
+            title: self.title(),
         }
     }
 
@@ -144,6 +168,10 @@ impl<Info: TabInfo> Tabs<Info> {
 
     pub fn tabs(&self) -> &Vec<Tab<Info>> {
         &self.tabs
+    }
+
+    pub fn display_tabs(&self) -> Vec<DisplayTab> {
+        self.tabs.iter().map(|tab| tab.to_display_tab()).collect()
     }
 
     pub fn insert(&mut self, tab: Tab<Info>) -> u32 {

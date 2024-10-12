@@ -15,7 +15,7 @@ pub fn get_fonts() -> Vec<Cow<'static, [u8]>> {
 }
 
 // Image details for passing the view around
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ImageInfo {
     pub pixels: Vec<u8>,
     pub width: u32,

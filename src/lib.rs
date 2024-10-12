@@ -19,3 +19,15 @@ mod shortcut;
 pub use shortcut::{
     shortcut_pressed, KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts,
 };
+
+/// Allows different widgets to interact in their native way
+#[derive(Debug, Clone, PartialEq)]
+pub enum TabSelectionType {
+    Id(u32),
+    Index(usize),
+}
+impl Default for TabSelectionType {
+    fn default() -> Self {
+        TabSelectionType::Index(0)
+    }
+}
