@@ -9,7 +9,7 @@ pub use engines::ultralight::Ultralight;
 
 pub mod widgets;
 pub use widgets::{
-    browser_view, command_palatte, nav_bar, tab_bar, HomepageType, IcyBrowser, Message,
+    browser_view, command_palette, nav_bar, tab_bar, HomepageType, IcyBrowser, Message,
 };
 
 mod helpers;

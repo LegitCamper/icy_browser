@@ -1,4 +1,4 @@
-use iced::widget::{center, column, container, mouse_area, opaque, stack, text_input};
+use iced::widget::{center, column, container, mouse_area, opaque, stack};
 use iced::widget::{scrollable, text, Column};
 use iced::{border, Color, Element, Length, Shadow, Theme};
 use iced_event_wrapper::wrapper;
@@ -29,7 +29,7 @@ impl ResultType {
     }
 }
 
-pub struct CommandPalatteState {
+pub struct CommandPaletteState {
     pub query: String,
     pub possible_results: Vec<ResultType>,
     pub filtered_results: Vec<ResultType>,
@@ -37,7 +37,7 @@ pub struct CommandPalatteState {
     pub has_error: bool,
 }
 
-impl CommandPalatteState {
+impl CommandPaletteState {
     pub fn new(bookmarks: Option<Vec<Bookmark>>) -> Self {
         let mut results: Vec<ResultType> = Vec::new();
         // This may need to be extended in the future
@@ -146,20 +146,30 @@ impl CommandPalatteState {
     }
 }
 
-impl Default for CommandPalatteState {
+impl Default for CommandPaletteState {
     fn default() -> Self {
         Self::new(None)
     }
 }
 
-pub fn command_palatte<'a>(
+pub fn command_palette<'a>(
     base: impl Into<Element<'a, Message>>,
-    state: &'a CommandPalatteState,
+    state: &'a CommandPaletteState,
 ) -> Element<'a, Message> {
+    let search = container(
+        text(if state.query.is_empty() {
+            "Command Palette"
+        } else {
+            &state.query
+        })
+        .size(25),
+    )
+    .style(|theme: &Theme| container::bordered_box(theme))
+    .padding(5)
+    .width(Length::Fill);
+
     let mut window = container(column![
-        text_input("Command Palatte", &state.query)
-            .on_input(Message::CommandPalatteQueryChanged)
-            .size(25),
+        search,
         container(results_list(
             state.filtered_results.as_slice(),
             state.selected_item.clone(),
@@ -214,7 +224,7 @@ pub fn command_palatte<'a>(
     ];
 
     wrapper(stack)
-        .on_keyboard_event(|event| Message::CommandPalatteKeyboardEvent(Some(event)))
+        .on_keyboard_event(|event| Message::CommandPaletteKeyboardEvent(Some(event)))
         .into()
 }
 

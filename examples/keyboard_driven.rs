@@ -16,7 +16,7 @@ fn main() -> iced::Result {
         ..Default::default()
     };
 
-    println!("Press 'Crtl + E' to open to Command palatte");
+    println!("Press 'Crtl + E' to open to Command palette");
 
     iced::application("Keyboard Driven Browser", Browser::update, Browser::view)
         .subscription(Browser::subscription)

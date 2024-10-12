@@ -21,8 +21,8 @@ pub use tab_bar::tab_bar;
 pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 
-pub mod command_palatte;
-pub use command_palatte::{command_palatte, CommandPalatteState, ResultType};
+pub mod command_palette;
+pub use command_palette::{command_palette, CommandPaletteState, ResultType};
 
 use crate::{
     engines::BrowserEngine, shortcut_pressed, to_url, Bookmark, Bookmarks, ImageInfo, Shortcuts,
@@ -35,7 +35,7 @@ pub trait CustomWidget<Message, Info: TabInfo + Clone> {
     fn view(
         &self,
         nav_bar_state: NavBarState,
-        command_window_state: CommandPalatteState,
+        command_window_state: CommandPaletteState,
         bookmarks: Option<Vec<Bookmark>>,
         shortcuts: Shortcuts,
     );
@@ -45,7 +45,7 @@ pub trait CustomWidget<Message, Info: TabInfo + Clone> {
 // Options exist only to have defaults for EnumIter
 #[derive(Debug, Clone, PartialEq, Display, EnumIter)]
 pub enum Message {
-    // Commands visible to user with shortcuts and command palatte
+    // Commands visible to user with shortcuts and command palette
     #[strum(to_string = "Go Backward (Back)")]
     GoBackward,
     #[strum(to_string = "Go Forward (Forward)")]
@@ -63,11 +63,11 @@ pub enum Message {
     CloseCurrentTab,
     #[strum(to_string = "New Tab")]
     CreateTab,
-    #[strum(to_string = "Toggle Command Palatte")]
+    #[strum(to_string = "Toggle Command Palette")]
     ToggleOverlay,
-    #[strum(to_string = "Show Command Palatte")]
+    #[strum(to_string = "Show Command Palette")]
     ShowOverlay,
-    #[strum(to_string = "Hide Command Palatte")]
+    #[strum(to_string = "Hide Command Palette")]
     HideOverlay,
     #[strum(to_string = "Toggle Tab Bar")]
     ToggleTabBar,
@@ -92,8 +92,8 @@ pub enum Message {
     Update,
     UrlChanged(String),
     UpdateUrl,
-    CommandPalatteQueryChanged(String),
-    CommandPalatteKeyboardEvent(Option<keyboard::Event>),
+    CommandPaletteQueryChanged,
+    CommandPaletteKeyboardEvent(Option<keyboard::Event>),
     SendKeyboardEvent(Option<keyboard::Event>),
     SendMouseEvent(Point, Option<mouse::Event>),
     UpdateViewSize(Size<u32>),
@@ -111,7 +111,7 @@ pub struct IcyBrowser<Engine: BrowserEngine> {
     engine: Engine,
     home: Url,
     nav_bar_state: NavBarState,
-    command_palatte_state: CommandPalatteState,
+    command_palette_state: CommandPaletteState,
     with_tab_bar: bool,
     with_nav_bar: bool,
     with_bookmark_bar: bool,
@@ -128,7 +128,7 @@ impl<Engine: BrowserEngine> Default for IcyBrowser<Engine> {
             engine: Engine::new(),
             home,
             nav_bar_state: NavBarState::new(),
-            command_palatte_state: CommandPalatteState::new(None),
+            command_palette_state: CommandPaletteState::new(None),
             with_tab_bar: false,
             with_nav_bar: false,
             with_bookmark_bar: false,
@@ -171,7 +171,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
     pub fn bookmarks(mut self, bookmarks: &[Bookmark]) -> Self {
         self.bookmarks = Some(bookmarks.to_vec());
-        self.command_palatte_state = CommandPalatteState::new(self.bookmarks.clone());
+        self.command_palette_state = CommandPaletteState::new(self.bookmarks.clone());
         self
     }
 
@@ -365,25 +365,25 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 self.with_bookmark_bar = false;
                 Task::none()
             }
-            Message::CommandPalatteQueryChanged(query) => {
-                self.command_palatte_state.query = query.clone();
-                self.command_palatte_state.filtered_results =
-                    self.command_palatte_state.possible_results.clone();
+            Message::CommandPaletteQueryChanged => {
+                self.command_palette_state.filtered_results =
+                    self.command_palette_state.possible_results.clone();
 
                 for tab in self.engine().get_tabs().display_tabs() {
-                    self.command_palatte_state
+                    self.command_palette_state
                         .filtered_results
                         .push(ResultType::Tab(tab));
                 }
 
+                let query = &self.command_palette_state.query;
                 if let Some(url) = to_url(query.as_str()) {
-                    self.command_palatte_state
+                    self.command_palette_state
                         .filtered_results
                         .push(ResultType::Url(url.to_string()));
                 }
 
-                self.command_palatte_state.filtered_results = self
-                    .command_palatte_state
+                self.command_palette_state.filtered_results = self
+                    .command_palette_state
                     .filtered_results
                     .clone()
                     .into_iter()
@@ -398,10 +398,10 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                 .contains(&query.to_lowercase())
                     })
                     .collect::<Vec<_>>();
-                self.command_palatte_state.first_item();
+                self.command_palette_state.first_item();
                 Task::none()
             }
-            Message::CommandPalatteKeyboardEvent(event) => {
+            Message::CommandPaletteKeyboardEvent(event) => {
                 if let Some(keyboard::Event::KeyPressed {
                     key,
                     modified_key: _,
@@ -416,66 +416,60 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                         shortcut.0 == Message::HideOverlay || shortcut.0 == Message::ToggleOverlay
                     }) {
                         if shortcut_pressed(shortcut, &key, &modifiers) {
-                            self.command_palatte_state.reset();
+                            self.command_palette_state.reset();
                             return Task::done(Message::HideOverlay);
                         }
                     }
                     match key {
                         key::Key::Named(key::Named::Escape) => {
-                            self.command_palatte_state.reset();
+                            self.command_palette_state.reset();
                             Task::done(Message::HideOverlay)
                         }
                         key::Key::Named(key::Named::ArrowDown) => {
-                            self.command_palatte_state.next_item();
+                            self.command_palette_state.next_item();
                             Task::none()
                         }
                         key::Key::Named(key::Named::ArrowUp) => {
-                            self.command_palatte_state.previous_item();
+                            self.command_palette_state.previous_item();
                             Task::none()
                         }
                         key::Key::Named(key::Named::Backspace) => {
-                            self.command_palatte_state.has_error = false;
-                            if !self.command_palatte_state.query.is_empty() {
-                                Task::done(Message::CommandPalatteQueryChanged(
-                                    self.command_palatte_state.query
-                                        [..self.command_palatte_state.query.len() - 1]
-                                        .to_string(),
-                                ))
+                            self.command_palette_state.has_error = false;
+                            if !self.command_palette_state.query.is_empty() {
+                                self.command_palette_state.query.pop();
+                                Task::done(Message::CommandPaletteQueryChanged)
                             } else {
                                 Task::none()
                             }
                         }
                         key::Key::Named(key::Named::Space) => {
-                            self.command_palatte_state.has_error = false;
-                            Task::done(Message::CommandPalatteQueryChanged(format!(
-                                "{} ",
-                                self.command_palatte_state.query
-                            )))
+                            self.command_palette_state.has_error = false;
+                            self.command_palette_state.query.push(' ');
+                            Task::done(Message::CommandPaletteQueryChanged)
                         }
                         key::Key::Character(char) => {
-                            self.command_palatte_state.has_error = false;
+                            self.command_palette_state.has_error = false;
                             // paste instead of registering char
                             if modifiers.control() && char.as_str() == "v" {
                                 if let Ok(ctx) = clipboard_rs::ClipboardContext::new() {
-                                    Task::done(Message::CommandPalatteQueryChanged(format!(
-                                        "{}{}",
-                                        self.command_palatte_state.query,
-                                        ctx.get_text().unwrap_or("".to_string())
-                                    )))
+                                    if let Ok(text) = ctx.get_text() {
+                                        self.command_palette_state.query = text;
+                                        Task::done(Message::CommandPaletteQueryChanged)
+                                    } else {
+                                        Task::none()
+                                    }
                                 } else {
                                     Task::none()
                                 }
                             } else {
-                                Task::done(Message::CommandPalatteQueryChanged(format!(
-                                    "{}{}",
-                                    self.command_palatte_state.query, char
-                                )))
+                                self.command_palette_state.query.push_str(char.as_str());
+                                Task::done(Message::CommandPaletteQueryChanged)
                             }
                         }
                         key::Key::Named(key::Named::Enter) => {
-                            for result in &self.command_palatte_state.filtered_results {
+                            for result in &self.command_palette_state.filtered_results {
                                 if let Some(selected_item) =
-                                    &self.command_palatte_state.selected_item
+                                    &self.command_palette_state.selected_item
                                 {
                                     if result.inner_name() == *selected_item {
                                         let task = match result {
@@ -491,7 +485,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                             }
                                         };
 
-                                        self.command_palatte_state.reset();
+                                        self.command_palette_state.reset();
 
                                         return Task::batch([
                                             Task::done(task),
@@ -501,7 +495,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                 }
                             }
 
-                            self.command_palatte_state.has_error = true;
+                            self.command_palette_state.has_error = true;
                             Task::none()
                         }
 
@@ -539,7 +533,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                         } = key
                         {
                             // Default behaviors
-                            // escape to exit command palatte
+                            // escape to exit command palette
                             if self.show_overlay && key == keyboard::Key::Named(key::Named::Escape)
                             {
                                 return Task::done(Message::HideOverlay);
@@ -588,7 +582,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
         let browser_view = browser_view(self.engine.get_tabs().get_current().get_view());
         if self.show_overlay {
-            column = column.push(command_palatte(browser_view, &self.command_palatte_state))
+            column = column.push(command_palette(browser_view, &self.command_palette_state))
         } else {
             column = column.push(browser_view);
         }
