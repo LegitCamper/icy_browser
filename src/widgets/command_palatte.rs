@@ -24,7 +24,7 @@ impl ResultType {
     }
 }
 
-pub struct CommandWindowState {
+pub struct CommandPalatteState {
     pub query: String,
     pub possible_results: Vec<ResultType>,
     pub filtered_results: Vec<ResultType>,
@@ -32,7 +32,7 @@ pub struct CommandWindowState {
     pub has_error: bool,
 }
 
-impl CommandWindowState {
+impl CommandPalatteState {
     pub fn new(bookmarks: Option<Vec<Bookmark>>) -> Self {
         let mut results: Vec<ResultType> = Vec::new();
         // This may need to be extended in the future
@@ -69,6 +69,13 @@ impl CommandWindowState {
             selected_item: None,
             has_error: false,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.query = String::new();
+        self.filtered_results = self.possible_results.clone();
+        self.selected_item = None;
+        self.has_error = false;
     }
 
     pub fn first_item(&mut self) {
@@ -134,7 +141,7 @@ impl CommandWindowState {
     }
 }
 
-impl Default for CommandWindowState {
+impl Default for CommandPalatteState {
     fn default() -> Self {
         Self::new(None)
     }
@@ -142,7 +149,7 @@ impl Default for CommandWindowState {
 
 pub fn command_palatte<'a>(
     base: impl Into<Element<'a, Message>>,
-    state: &'a CommandWindowState,
+    state: &'a CommandPalatteState,
 ) -> Element<'a, Message> {
     let mut window = container(column![
         text_input("Command Palatte", &state.query)

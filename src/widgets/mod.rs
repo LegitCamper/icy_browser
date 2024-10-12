@@ -1,3 +1,4 @@
+use clipboard_rs::Clipboard;
 use iced::keyboard::{self, key};
 use iced::widget::{self, column};
 use iced::{mouse, Element, Event, Point, Size, Subscription, Task};
@@ -21,7 +22,7 @@ pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 
 pub mod command_palatte;
-pub use command_palatte::{command_palatte, CommandWindowState, ResultType};
+pub use command_palatte::{command_palatte, CommandPalatteState, ResultType};
 
 use crate::{
     engines::BrowserEngine, shortcut_pressed, to_url, Bookmark, Bookmarks, ImageInfo, Shortcuts,
@@ -33,7 +34,7 @@ pub trait CustomWidget<Message> {
     fn view(
         &self,
         nav_bar_state: NavBarState,
-        command_window_state: CommandWindowState,
+        command_window_state: CommandPalatteState,
         bookmarks: Option<Vec<Bookmark>>,
         shortcuts: Shortcuts,
     );
@@ -121,7 +122,7 @@ pub struct IcyBrowser<Engine: BrowserEngine> {
     engine: Engine,
     home: Url,
     nav_bar_state: NavBarState,
-    command_window_state: CommandWindowState,
+    command_palatte_state: CommandPalatteState,
     with_tab_bar: bool,
     with_nav_bar: bool,
     with_bookmark_bar: bool,
@@ -138,7 +139,7 @@ impl<Engine: BrowserEngine> Default for IcyBrowser<Engine> {
             engine: Engine::new(),
             home,
             nav_bar_state: NavBarState::new(),
-            command_window_state: CommandWindowState::new(None),
+            command_palatte_state: CommandPalatteState::new(None),
             with_tab_bar: false,
             with_nav_bar: false,
             with_bookmark_bar: false,
@@ -181,7 +182,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
     pub fn bookmarks(mut self, bookmarks: &[Bookmark]) -> Self {
         self.bookmarks = Some(bookmarks.to_vec());
-        self.command_window_state = CommandWindowState::new(self.bookmarks.clone());
+        self.command_palatte_state = CommandPalatteState::new(self.bookmarks.clone());
         self
     }
 
@@ -249,6 +250,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
         Task::none()
     }
 
+    /// the update method which is required by iced for widgets
     pub fn update(&mut self, event: Message) -> Task<Message> {
         let task = match event {
             Message::Update => self.force_update(),
@@ -375,18 +377,18 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                 Task::none()
             }
             Message::CommandPalatteQueryChanged(query) => {
-                self.command_window_state.query = query.clone();
-                self.command_window_state.filtered_results =
-                    self.command_window_state.possible_results.clone();
+                self.command_palatte_state.query = query.clone();
+                self.command_palatte_state.filtered_results =
+                    self.command_palatte_state.possible_results.clone();
 
                 if let Some(url) = to_url(query.as_str()) {
-                    self.command_window_state
+                    self.command_palatte_state
                         .filtered_results
                         .push(ResultType::Url(url.to_string()));
                 }
 
-                self.command_window_state.filtered_results = self
-                    .command_window_state
+                self.command_palatte_state.filtered_results = self
+                    .command_palatte_state
                     .filtered_results
                     .clone()
                     .into_iter()
@@ -401,6 +403,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                 .contains(&query.to_lowercase())
                     })
                     .collect::<Vec<_>>();
+                self.command_palatte_state.first_item();
                 Task::none()
             }
             Message::CommandPalatteKeyboardEvent(event) => {
@@ -418,56 +421,66 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                         shortcut.0 == Message::HideOverlay || shortcut.0 == Message::ToggleOverlay
                     }) {
                         if shortcut_pressed(shortcut, &key, &modifiers) {
+                            self.command_palatte_state.reset();
                             return Task::done(Message::HideOverlay);
                         }
                     }
                     match key {
                         key::Key::Named(key::Named::Escape) => {
-                            self.command_window_state =
-                                CommandWindowState::new(self.bookmarks.clone());
+                            self.command_palatte_state.reset();
                             Task::done(Message::HideOverlay)
                         }
                         key::Key::Named(key::Named::ArrowDown) => {
-                            self.command_window_state.next_item();
+                            self.command_palatte_state.next_item();
                             Task::none()
                         }
                         key::Key::Named(key::Named::ArrowUp) => {
-                            self.command_window_state.previous_item();
+                            self.command_palatte_state.previous_item();
                             Task::none()
                         }
                         key::Key::Named(key::Named::Backspace) => {
-                            self.command_window_state.has_error = false;
-                            self.command_window_state.first_item();
-                            if self.command_window_state.query.is_empty() {
-                                Task::none()
-                            } else {
+                            self.command_palatte_state.has_error = false;
+                            if !self.command_palatte_state.query.is_empty() {
                                 Task::done(Message::CommandPalatteQueryChanged(
-                                    self.command_window_state.query
-                                        [..self.command_window_state.query.len() - 1]
+                                    self.command_palatte_state.query
+                                        [..self.command_palatte_state.query.len() - 1]
                                         .to_string(),
                                 ))
+                            } else {
+                                Task::none()
                             }
                         }
                         key::Key::Named(key::Named::Space) => {
-                            self.command_window_state.has_error = false;
-                            self.command_window_state.first_item();
+                            self.command_palatte_state.has_error = false;
                             Task::done(Message::CommandPalatteQueryChanged(format!(
                                 "{} ",
-                                self.command_window_state.query
+                                self.command_palatte_state.query
                             )))
                         }
                         key::Key::Character(char) => {
-                            self.command_window_state.has_error = false;
-                            self.command_window_state.first_item();
-                            Task::done(Message::CommandPalatteQueryChanged(format!(
-                                "{}{}",
-                                self.command_window_state.query, char
-                            )))
+                            self.command_palatte_state.has_error = false;
+                            // paste instead of registering char
+                            if modifiers.control() && char.as_str() == "v" {
+                                if let Ok(ctx) = clipboard_rs::ClipboardContext::new() {
+                                    Task::done(Message::CommandPalatteQueryChanged(format!(
+                                        "{}{}",
+                                        self.command_palatte_state.query,
+                                        ctx.get_text().unwrap_or("".to_string())
+                                    )))
+                                } else {
+                                    Task::none()
+                                }
+                            } else {
+                                Task::done(Message::CommandPalatteQueryChanged(format!(
+                                    "{}{}",
+                                    self.command_palatte_state.query, char
+                                )))
+                            }
                         }
                         key::Key::Named(key::Named::Enter) => {
-                            for result in &self.command_window_state.filtered_results {
+                            for result in &self.command_palatte_state.filtered_results {
                                 if let Some(selected_item) =
-                                    &self.command_window_state.selected_item
+                                    &self.command_palatte_state.selected_item
                                 {
                                     if result.inner_name() == *selected_item {
                                         let task = match result {
@@ -480,8 +493,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                             }
                                         };
 
-                                        self.command_window_state =
-                                            CommandWindowState::new(self.bookmarks.clone());
+                                        self.command_palatte_state.reset();
 
                                         return Task::batch([
                                             Task::done(task),
@@ -491,7 +503,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
                                 }
                             }
 
-                            self.command_window_state.has_error = true;
+                            self.command_palatte_state.has_error = true;
                             Task::none()
                         }
 
@@ -578,7 +590,7 @@ impl<Engine: BrowserEngine> IcyBrowser<Engine> {
 
         let browser_view = browser_view(self.engine.get_tabs().get_current().get_view());
         if self.show_overlay {
-            column = column.push(command_palatte(browser_view, &self.command_window_state))
+            column = column.push(command_palatte(browser_view, &self.command_palatte_state))
         } else {
             column = column.push(browser_view);
         }
