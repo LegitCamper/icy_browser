@@ -3,24 +3,18 @@
 
 [![Build](https://github.com/LegitCamper/icy_browser/actions/workflows/ci.yml/badge.svg)](https://github.com/LegitCamper/icy_browser/actions/workflows/ci.yml)
 
-### Supported Browser Engines
-| Browser Engine | Support      |
-| ----------------- | --------- |
-| WebKit/Ultralight | <span>&#10003;</span> |
-| Chromium/CEF      | X Planned |
-
-
 ### Browser Widgets
+- [iced_webview](https://github.com/LegitCamper/iced_webview) 
+> Currently only supports [Ultralight which has its own licence](https://ultralig.ht/pricing/) you should review 
 - Navigation Bar
 - Tab Bar
 - Bookmark Bar
-- Browser View
 
 ### Examples
 #### basic_browser.rs
-`cargo run --example basic_browser --features ultralight-resources`
 <img src="https://github.com/LegitCamper/icy_browser/blob/main/assets/basic_browser.png?raw=true" width=50%>
 
+`cargo run --example basic_browser --features ultralight-resources`
 ``` Rust
 use iced::{Settings, Task, Theme};
 use icy_browser::{get_fonts, Bookmark, IcyBrowser, Message, Ultralight};
