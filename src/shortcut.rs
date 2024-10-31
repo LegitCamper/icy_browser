@@ -1,7 +1,5 @@
 use iced::keyboard::{Key, Modifiers};
 
-use super::widgets::Message;
-
 pub struct ShortcutBuilder(Shortcuts);
 impl ShortcutBuilder {
     pub fn new() -> Self {
