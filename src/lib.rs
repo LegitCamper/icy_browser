@@ -10,6 +10,8 @@ pub use bookmark_bar::bookmark_bar;
 // pub mod command_palette;
 pub mod nav_bar;
 pub mod tab_bar;
+pub use tab_bar::tab_bar_basic;
+pub use tab_bar_basic as tab_bar;
 
 // mod shortcut;
 // pub use shortcut::{
