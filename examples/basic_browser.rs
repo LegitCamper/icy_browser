@@ -3,7 +3,7 @@
 use iced::widget::{center, column, container, text, Space};
 use iced::{Element, Length, Settings, Subscription, Task, Theme};
 use icy_browser::iced_webview::{Action, Ultralight, WebView};
-use icy_browser::{bookmark_bar, get_fonts, tab_bar, Bookmark};
+use icy_browser::{bookmark_bar, get_fonts, nav_bar, tab_bar, Bookmark};
 use std::time::Duration;
 use url::Url;
 
@@ -40,6 +40,10 @@ enum Message {
     CloseTab(u32),
     ChangeTab(u32),
     Gotourl(String),
+    GoBack,
+    GoFoward,
+    GoHome,
+    Refresh,
 }
 
 struct App {
@@ -121,6 +125,14 @@ impl App {
                     .webview
                     .update(Action::GoToUrl(Url::parse(&url).unwrap()))
             }
+            Message::GoBack => return self.webview.update(Action::GoBackward),
+            Message::GoFoward => return self.webview.update(Action::GoForward),
+            Message::GoHome => {
+                return self
+                    .webview
+                    .update(Action::GoToUrl(Url::parse(HOME).unwrap()))
+            }
+            Message::Refresh => return self.webview.update(Action::Refresh),
         }
         Task::none()
     }
@@ -139,8 +151,24 @@ impl App {
             } else {
                 container(Space::new(Length::Fill, 10))
             };
+
+            let url = if let Some(tab) = self.tabs.get(current_tab as usize) {
+                tab.url.clone()
+            } else {
+                "loading...".to_string()
+            };
+            let nav_bar = nav_bar(
+                url,
+                Message::GoBack,
+                Message::GoFoward,
+                Message::GoHome,
+                Message::Refresh,
+                Box::new(Message::UrlChanged),
+                Box::new(Message::Gotourl),
+            );
             column![
                 tab_bar,
+                nav_bar,
                 bookmark_bar(self.bookmarks.as_slice(), Box::new(Message::Gotourl)),
                 self.webview.view().map(Message::Webview)
             ]

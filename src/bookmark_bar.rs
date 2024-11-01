@@ -1,6 +1,6 @@
 use iced::{
     widget::{button, Row},
-    Element, Length,
+    Element,
 };
 
 use crate::Bookmark;

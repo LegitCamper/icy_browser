@@ -1,4 +1,3 @@
-use iced::widget::{button, Button};
 pub use iced_fonts::BOOTSTRAP_FONT_BYTES;
 pub use iced_on_focus_widget::hoverable;
 pub use iced_webview;
@@ -9,6 +8,7 @@ pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
 // pub mod command_palette;
 pub mod nav_bar;
+pub use nav_bar::nav_bar;
 pub mod tab_bar;
 pub use tab_bar::tab_bar_basic;
 pub use tab_bar_basic as tab_bar;
