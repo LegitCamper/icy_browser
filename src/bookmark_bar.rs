@@ -16,6 +16,7 @@ pub fn bookmark_bar<'a, Message: Clone + 'a>(
             .map(|bookmark| {
                 button(bookmark.name().as_str())
                     .on_press(on_press(bookmark.url().to_string()))
+                    .padding(5)
                     .into()
             })
             .collect(),

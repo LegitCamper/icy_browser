@@ -21,7 +21,7 @@ fn main() -> iced::Result {
         .run_with(App::new)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Tab {
     url: String,
     title: String,
@@ -59,7 +59,7 @@ impl App {
             App {
                 webview: WebView::new()
                     .on_title_change(Message::TitleChanged)
-                    .on_title_change(Message::UrlChanged)
+                    .on_url_change(Message::UrlChanged)
                     .on_create_view(Message::TabCreated),
                 tab: None,
                 tabs: Vec::new(),
@@ -78,8 +78,8 @@ impl App {
                         tab.title = title
                     } else {
                         self.tabs.push(Tab {
-                            url: String::new(),
                             title,
+                            ..Default::default()
                         });
                     }
                 }
@@ -90,8 +90,8 @@ impl App {
                         tab.url = url
                     } else {
                         self.tabs.push(Tab {
-                            title: String::new(),
                             url,
+                            ..Default::default()
                         });
                     }
                 }
@@ -109,10 +109,6 @@ impl App {
                         .map(Message::Webview)
                         .chain(Task::done(Message::InitTab));
                 }
-                self.tabs.push(Tab {
-                    url: String::new(),
-                    title: String::new(),
-                });
             }
             Message::CloseTab(index) => {
                 return self.webview.update(Action::CloseView(index as u32))

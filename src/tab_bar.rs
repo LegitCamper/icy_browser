@@ -35,8 +35,9 @@ pub fn tab_bar_basic<Message: 'static + Clone>(
             .set_active_tab(&active_tab)
             .on_close(move |(id, _)| (on_close_tab)(id))
             .tab_width(Length::Shrink)
-            .spacing(5.0)
-            .padding(5.0),
+            .height(Length::Shrink)
+            .spacing(5)
+            .padding(5),
         container(tooltip(
             Button::new(icon_to_text(Bootstrap::Plus))
                 .on_press(on_create_tab)
@@ -46,6 +47,7 @@ pub fn tab_bar_basic<Message: 'static + Clone>(
         ))
         .height(Length::Shrink),
     ]
+    .padding(5)
     .into()
 }
 
@@ -89,5 +91,6 @@ pub fn tab_bar_advanced<Message: 'static + Clone>(
         ))
         .height(Length::Fill),
     ]
+    .padding(5)
     .into()
 }

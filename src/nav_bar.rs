@@ -1,4 +1,4 @@
-use iced::widget::{row, text::LineHeight, text_input, tooltip, tooltip::Position, Button, Space};
+use iced::widget::{row, text_input, tooltip, tooltip::Position, Button, Space};
 use iced::{Element, Length};
 use iced_aw::core::icons::bootstrap::{icon_to_text, Bootstrap};
 
@@ -38,13 +38,19 @@ pub fn nav_bar<Message: 'static + Clone>(
     );
     let space_left = Space::new(Length::Fill, Length::Shrink);
     let space_right = Space::new(Length::Fill, Length::Shrink);
+    let url = if url.contains("https://") {
+        format!("{} {}", Bootstrap::Lock, url)
+    } else {
+        format!("{} {}", Bootstrap::Unlock, url)
+    };
     let search = text_input("https://site.com", url.as_str())
         .on_input(on_url_change)
         .on_submit((on_url_submit)(url))
         .on_paste(on_url_submit)
-        .line_height(LineHeight::Relative(2.0));
+        .size(18)
+        .padding(2.5);
 
-    row!(
+    row![
         back,
         forward,
         home,
@@ -52,7 +58,9 @@ pub fn nav_bar<Message: 'static + Clone>(
         space_left,
         search,
         space_right
-    )
+    ]
+    .padding(5)
+    .spacing(2)
     .into()
 }
 
