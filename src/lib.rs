@@ -12,11 +12,8 @@ pub use nav_bar::nav_bar;
 pub mod tab_bar;
 pub use tab_bar::tab_bar_basic;
 pub use tab_bar_basic as tab_bar;
-
-// mod shortcut;
-// pub use shortcut::{
-//     shortcut_pressed, KeyType, Shortcut, ShortcutBuilder, ShortcutModifier, Shortcuts,
-// };
+pub mod shortcut;
+pub use shortcut::{Shortcut, ShortcutModifier};
 
 // Helper function to ensure required icons are imported
 pub fn get_fonts() -> Vec<Cow<'static, [u8]>> {

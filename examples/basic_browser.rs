@@ -14,11 +14,11 @@ fn main() -> iced::Result {
         fonts: get_fonts(),
         ..Default::default()
     };
-    iced::application("Basic Browser", App::update, App::view)
-        .subscription(App::subscription)
+    iced::application("Basic Browser", Browser::update, Browser::view)
+        .subscription(Browser::subscription)
         .settings(settings)
         .theme(|_| Theme::Dark)
-        .run_with(App::new)
+        .run_with(Browser::new)
 }
 
 #[derive(Debug, Default)]
@@ -41,22 +41,22 @@ enum Message {
     ChangeTab(u32),
     Gotourl(String),
     GoBack,
-    GoFoward,
+    GoForward,
     GoHome,
     Refresh,
 }
 
-struct App {
+struct Browser {
     webview: WebView<Ultralight, Message>,
     tab: Option<u32>,
     tabs: Vec<Tab>,
     bookmarks: Vec<Bookmark>,
 }
 
-impl App {
+impl Browser {
     fn new() -> (Self, Task<Message>) {
         (
-            App {
+            Browser {
                 webview: WebView::new()
                     .on_title_change(Message::TitleChanged)
                     .on_url_change(Message::UrlChanged)
@@ -68,6 +68,7 @@ impl App {
             Task::done(Message::CreateTab(HOME.to_string())),
         )
     }
+
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Webview(msg) => return self.webview.update(msg),
@@ -122,7 +123,7 @@ impl App {
                     .update(Action::GoToUrl(Url::parse(&url).unwrap()))
             }
             Message::GoBack => return self.webview.update(Action::GoBackward),
-            Message::GoFoward => return self.webview.update(Action::GoForward),
+            Message::GoForward => return self.webview.update(Action::GoForward),
             Message::GoHome => {
                 return self
                     .webview
@@ -156,7 +157,7 @@ impl App {
             let nav_bar = nav_bar(
                 url,
                 Message::GoBack,
-                Message::GoFoward,
+                Message::GoForward,
                 Message::GoHome,
                 Message::Refresh,
                 Box::new(Message::UrlChanged),
