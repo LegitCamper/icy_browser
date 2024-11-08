@@ -4,67 +4,46 @@ use iced::{border, Color, Element, Length, Shadow, Theme};
 use iced_event_wrapper::wrapper;
 use strum_macros::Display;
 
-use crate::engines::DisplayTab;
-use crate::{Bookmark, Message};
+use crate::Bookmark;
 
 #[derive(Clone, Debug, Display, PartialEq)]
-pub enum ResultType {
+enum PaletteEntry<Message> {
     #[strum(to_string = "Commands")]
     Command(Message),
     #[strum(to_string = "Bookmarks")]
     Bookmark(Bookmark),
     #[strum(to_string = "Tabs")]
-    Tab(DisplayTab),
-    Url(String),
+    /// title, url
+    Tab(String, String),
 }
 
-impl ResultType {
+impl<Message: ToString> PaletteEntry<Message> {
     pub fn inner_name(&self) -> String {
         match self {
-            ResultType::Command(command) => command.to_string(),
-            ResultType::Bookmark(bookmark) => format!("{} -> {}", bookmark.name(), bookmark.url()),
-            ResultType::Url(url) => url.to_string(),
-            ResultType::Tab(tab) => format!("{} -> {}", tab.title, tab.url),
+            PaletteEntry::Command(command) => command.to_string(),
+            PaletteEntry::Bookmark(bookmark) => {
+                format!("{} -> {}", bookmark.name(), bookmark.url())
+            }
+            PaletteEntry::Tab(title, url) => format!("{}: {}", title, url),
         }
     }
 }
 
-pub struct CommandPaletteState {
+pub struct CommandPaletteState<Message> {
     pub query: String,
-    pub possible_results: Vec<ResultType>,
-    pub filtered_results: Vec<ResultType>,
+    pub possible_results: Vec<PaletteEntry<Message>>,
+    pub filtered_results: Vec<PaletteEntry<Message>>,
     pub selected_item: Option<String>,
     pub has_error: bool,
 }
 
-impl CommandPaletteState {
-    pub fn new(bookmarks: Option<Vec<Bookmark>>) -> Self {
-        let mut results: Vec<ResultType> = Vec::new();
+impl<Message: ToString + Clone> CommandPaletteState<Message> {
+    pub fn new(commands: Vec<Message>, bookmarks: Option<Vec<Bookmark>>) -> Self {
+        let mut results: Vec<PaletteEntry<Message>> = Vec::new();
         // This may need to be extended in the future
-        results.extend(
-            vec![
-                Message::GoBackward,
-                Message::GoForward,
-                Message::Refresh,
-                Message::GoHome,
-                Message::CloseCurrentTab,
-                Message::CreateTab,
-                Message::HideOverlay,
-                Message::ToggleTabBar,
-                Message::ShowTabBar,
-                Message::HideTabBar,
-                Message::ToggleNavBar,
-                Message::ShowNavBar,
-                Message::HideNavBar,
-                Message::ToggleBookmarkBar,
-                Message::ShowBookmarkBar,
-                Message::HideBookmarkBar,
-            ]
-            .into_iter()
-            .map(ResultType::Command),
-        );
+        results.extend(commands.into_iter().map(PaletteEntry::Command));
         if let Some(bookmarks) = bookmarks {
-            results.extend(bookmarks.into_iter().map(ResultType::Bookmark));
+            results.extend(bookmarks.into_iter().map(PaletteEntry::Bookmark));
         };
 
         Self {
@@ -146,15 +125,16 @@ impl CommandPaletteState {
     }
 }
 
-impl Default for CommandPaletteState {
+impl<Message: ToString + Clone> Default for CommandPaletteState<Message> {
     fn default() -> Self {
-        Self::new(None)
+        Self::new(Vec::new(), None)
     }
 }
 
-pub fn command_palette<'a>(
-    base: impl Into<Element<'a, Message>>,
-    state: &'a CommandPaletteState,
+pub fn command_palette<'a, Message: ToString + Clone>(
+    webview: impl Into<Element<'a, Message>>,
+    state: &'a CommandPaletteState<Message>,
+    on_hide_command_pallette: Message,
 ) -> Element<'a, Message> {
     let search = container(
         text(if state.query.is_empty() {
@@ -204,8 +184,8 @@ pub fn command_palette<'a>(
         });
     }
 
-    let stack = stack![
-        base.into(),
+    wrapper(stack![
+        webview.into(),
         opaque(
             mouse_area(center(opaque(window)).style(|_theme| {
                 container::Style {
@@ -219,16 +199,17 @@ pub fn command_palette<'a>(
                     ..container::Style::default()
                 }
             }))
-            .on_press(Message::HideOverlay),
+            .on_press(on_hide_command_pallette),
         )
-    ];
-
-    wrapper(stack)
-        .on_keyboard_event(|event| Message::CommandPaletteKeyboardEvent(Some(event)))
-        .into()
+    ])
+    // .on_keyboard_event(|event| Message::CommandPaletteKeyboardEvent(Some(event)))
+    .into()
 }
 
-fn results_list<'a>(results: &[ResultType], selected_item: Option<String>) -> Element<'a, Message> {
+fn results_list<'a, Message: ToString + 'a>(
+    results: &[PaletteEntry<Message>],
+    selected_item: Option<String>,
+) -> Element<'a, Message> {
     let mut list = Vec::new();
     let mut result_types = Vec::new();
 

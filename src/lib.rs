@@ -6,7 +6,8 @@ use url::{ParseError, Url};
 
 pub mod bookmark_bar;
 pub use bookmark_bar::bookmark_bar;
-// pub mod command_palette;
+pub mod command_palette;
+pub use command_palette::{command_palette, CommandPaletteState};
 pub mod nav_bar;
 pub use nav_bar::nav_bar;
 pub mod tab_bar;

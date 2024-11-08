@@ -1,12 +1,17 @@
-// Simple keybaord driven browser using the ultralight(webkit) webengine as a backend
+// Simple keyboard driven browser using the ultralight(webkit) webengine as a backend
 
-use iced::widget::{center, column, container, text, Space};
-use iced::{Element, Length, Settings, Subscription, Task, Theme};
-use icy_browser::iced_webview::{Action, Ultralight, WebView};
+use iced::widget::{center, container, text, Space};
+use iced::{event, keyboard, Element, Settings, Subscription, Task, Theme};
+use icy_browser::iced_webview::{
+    advanced::{Action, WebView},
+    Ultralight, ViewId,
+};
 use icy_browser::{
-    bookmark_bar, get_fonts, nav_bar, tab_bar, Bookmark, Shortcut, ShortcutModifier,
+    bookmark_bar, command_palette, get_fonts, nav_bar, tab_bar, Bookmark, CommandPaletteState,
+    Shortcut, ShortcutModifier,
 };
 use std::time::Duration;
+use strum_macros::Display;
 use url::Url;
 
 const HOME: &'static str = "https://google.com";
@@ -28,37 +33,41 @@ fn main() -> iced::Result {
 
 #[derive(Debug, Default)]
 struct Tab {
+    id: ViewId,
     url: String,
     title: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Display)]
 enum Message {
     UpdateWebview,
     Webview(Action),
-    TitleChanged(String),
-    UrlChanged(String),
+    Event(event::Event),
+    TitleChanged(ViewId, String),
+    UrlChanged(ViewId, String),
     InitTab, // Called after the first tab is created, to set tab to 0
     CreateTab(String),
     CreateDefaultTab,
-    TabCreated,
-    CloseTab(u32),
-    ChangeTab(u32),
+    TabCreated(ViewId),
+    CloseTab(ViewId),
+    ChangeTab(ViewId),
     Gotourl(String),
     GoBack,
     GoForward,
     GoHome,
     Refresh,
     ToggleCommandPalette,
+    HideCommandPalette,
 }
 
 struct Browser<'a> {
     webview: WebView<Ultralight, Message>,
-    tab: Option<u32>,
+    tab: Option<ViewId>,
     tabs: Vec<Tab>,
     bookmarks: Vec<Bookmark>,
     shortcuts: Vec<Shortcut<'a, Message>>,
-    show_palatte: bool,
+    command_palette_state: CommandPaletteState<Message>,
+    show_palette: bool,
 }
 
 impl<'a> Browser<'_> {
@@ -83,7 +92,8 @@ impl<'a> Browser<'_> {
                     Shortcut::new(Message::CreateDefaultTab, ShortcutModifier::Ctrl, "t"),
                     Shortcut::new(Message::ToggleCommandPalette, ShortcutModifier::Ctrl, "e"),
                 ],
-                show_palatte: false,
+                command_palette_state: CommandPaletteState::default(),
+                show_palette: false,
             },
             Task::done(Message::CreateTab(HOME.to_string())),
         )
@@ -92,29 +102,29 @@ impl<'a> Browser<'_> {
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Webview(msg) => return self.webview.update(msg),
-            Message::UpdateWebview => return self.webview.update(Action::Update),
-            Message::TitleChanged(title) => {
+            Message::UpdateWebview => {
                 if let Some(tab) = self.tab {
-                    if let Some(tab) = self.tabs.get_mut(tab as usize) {
-                        tab.title = title
-                    } else {
-                        self.tabs.push(Tab {
-                            title,
-                            ..Default::default()
-                        });
-                    }
+                    return self.webview.update(Action::Update(tab));
                 }
             }
-            Message::UrlChanged(url) => {
-                if let Some(tab) = self.tab {
-                    if let Some(tab) = self.tabs.get_mut(tab as usize) {
-                        tab.url = url
-                    } else {
-                        self.tabs.push(Tab {
-                            url,
-                            ..Default::default()
-                        });
-                    }
+            Message::TitleChanged(id, title) => {
+                if let Some(tab) = self.tabs.get_mut(id) {
+                    tab.title = title
+                } else {
+                    self.tabs.push(Tab {
+                        title,
+                        ..Default::default()
+                    });
+                }
+            }
+            Message::UrlChanged(id, url) => {
+                if let Some(tab) = self.tabs.get_mut(id) {
+                    tab.url = url
+                } else {
+                    self.tabs.push(Tab {
+                        url,
+                        ..Default::default()
+                    });
                 }
             }
             Message::InitTab => self.tab = Some(0),
@@ -124,42 +134,66 @@ impl<'a> Browser<'_> {
                     .webview
                     .update(Action::CreateView(iced_webview::PageType::Url(url)));
             }
-            Message::TabCreated => {
-                if self.tab.is_none() {
-                    return Task::done(Action::ChangeView(0))
-                        .map(Message::Webview)
-                        .chain(Task::done(Message::InitTab));
-                }
-            }
-            Message::CloseTab(index) => {
-                return self.webview.update(Action::CloseView(index as u32))
-            }
-            Message::ChangeTab(index) => {
-                return self.webview.update(Action::ChangeView(index as u32))
-            }
+            Message::TabCreated(id) => self.tab = Some(id),
+            Message::CloseTab(id) => return self.webview.update(Action::CloseView(id)),
+            Message::ChangeTab(id) => self.tab = Some(id),
             Message::Gotourl(url) => {
-                return self
-                    .webview
-                    .update(Action::GoToUrl(Url::parse(&url).unwrap()))
+                return self.webview.update(Action::GoToUrl(
+                    self.tab.unwrap(),
+                    Url::parse(&url).unwrap(),
+                ))
             }
-            Message::GoBack => return self.webview.update(Action::GoBackward),
-            Message::GoForward => return self.webview.update(Action::GoForward),
-            Message::GoHome => {
-                return self
-                    .webview
-                    .update(Action::GoToUrl(Url::parse(HOME).unwrap()))
-            }
-            Message::Refresh => return self.webview.update(Action::Refresh),
-            Message::ToggleCommandPalette => self.show_palatte = !self.show_palatte,
+            Message::GoBack => return self.webview.update(Action::GoBackward(self.tab.unwrap())),
+            Message::GoForward => return self.webview.update(Action::GoForward(self.tab.unwrap())),
+            Message::GoHome => return self.update(Message::Gotourl(HOME.to_string())),
+            Message::Refresh => return self.webview.update(Action::Refresh(self.tab.unwrap())),
+            Message::ToggleCommandPalette => self.show_palette = !self.show_palette,
+            Message::HideCommandPalette => self.show_palette = false,
+            Message::Event(event) => match event {
+                iced::Event::Keyboard(event) => match event {
+                    keyboard::Event::KeyPressed {
+                        key,
+                        modified_key: _,
+                        physical_key: _,
+                        location: _,
+                        modifiers,
+                        text: _,
+                    } => {
+                        for shortcut in self.shortcuts.iter() {
+                            if shortcut.is_pressed(&key, &modifiers) {
+                                return Task::done(shortcut.action.clone());
+                            }
+                        }
+                    }
+                    _ => (),
+                },
+                _ => (),
+            },
         }
         Task::none()
     }
 
     fn view(&self) -> Element<Message> {
-        column![self.webview.view().map(Message::Webview)].into()
+        if let Some(tab) = self.tab {
+            let webview = self.webview.view(tab).map(Message::Webview);
+            if self.show_palette {
+                command_palette(
+                    webview,
+                    &self.command_palette_state,
+                    Message::HideCommandPalette,
+                )
+            } else {
+                webview.into()
+            }
+        } else {
+            center(text("loading...")).into()
+        }
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced::time::every(Duration::from_millis(10)).map(|_| Message::UpdateWebview)
+        Subscription::batch([
+            iced::time::every(Duration::from_millis(10)).map(|_| Message::UpdateWebview),
+            event::listen().map(Message::Event),
+        ])
     }
 }

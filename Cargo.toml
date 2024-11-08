@@ -17,7 +17,8 @@ ultralight = ["iced_webview/ultralight"]
 ultralight-resources = ["iced_webview/ultralight-resources"]
 
 [dependencies.iced_webview]
-git = "https://github.com/LegitCamper/iced_webview"
+# git = "https://github.com/LegitCamper/iced_webview"
+version = "0.0.5"
 default-features = false
 
 [dependencies]
@@ -27,3 +28,4 @@ iced_fonts = { version = "0.1.1", features = ["bootstrap"] }
 iced_on_focus_widget = "0.1.1"
 iced_event_wrapper = { git = "https://github.com/LegitCamper/iced_event_wrapper" }
 url = "2.5.2"
+strum_macros = "0.26.4"
