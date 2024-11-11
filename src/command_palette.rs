@@ -1,13 +1,21 @@
+use crate::Bookmark;
+use iced::advanced::layout::{Layout, Limits, Node};
+use iced::advanced::renderer::Style;
+use iced::advanced::widget::{Tree, Widget};
+use iced::advanced::{Clipboard, Shell};
+use iced::keyboard::{self, Key};
+use iced::mouse::Cursor;
+use iced::widget::canvas::event::Status;
 use iced::widget::{center, column, container, mouse_area, opaque, stack};
 use iced::widget::{scrollable, text, Column};
-use iced::{border, Color, Element, Length, Shadow, Theme};
-use iced_event_wrapper::wrapper;
+use iced::{border, Color, Element, Length, Theme};
+use iced::{Event, Rectangle, Renderer, Size};
 use strum_macros::Display;
 
-use crate::Bookmark;
-
 #[derive(Clone, Debug, Display, PartialEq)]
-enum PaletteEntry<Message> {
+/// The entry types for command palette
+pub enum PaletteEntry<Message> {
+    None,
     #[strum(to_string = "Commands")]
     Command(Message),
     #[strum(to_string = "Bookmarks")]
@@ -25,16 +33,54 @@ impl<Message: ToString> PaletteEntry<Message> {
                 format!("{} -> {}", bookmark.name(), bookmark.url())
             }
             PaletteEntry::Tab(title, url) => format!("{}: {}", title, url),
+            PaletteEntry::None => String::new(),
         }
     }
 }
 
-pub struct CommandPaletteState<Message> {
-    pub query: String,
-    pub possible_results: Vec<PaletteEntry<Message>>,
-    pub filtered_results: Vec<PaletteEntry<Message>>,
-    pub selected_item: Option<String>,
-    pub has_error: bool,
+fn results_list<'a, Message: ToString + 'a>(
+    results: &[PaletteEntry<Message>],
+    selected_item: Option<String>,
+) -> Element<'a, Message> {
+    let mut list = Vec::new();
+    let mut result_types = Vec::new();
+
+    for result in results {
+        if !result_types.contains(&result.to_string()) {
+            result_types.push(result.to_string());
+            list.push(text(result.to_string()).size(20).into())
+        }
+
+        let mut text = container(text(format!("   {}", result.inner_name())).size(16));
+        if let Some(selected_item) = selected_item.as_ref() {
+            if result.inner_name() == *selected_item {
+                text = text.style(|theme: &Theme| {
+                    container::Style::default().background(theme.palette().primary)
+                })
+            }
+        }
+        list.push(text.into())
+    }
+
+    scrollable(Column::from_vec(list))
+        .width(Length::Fill)
+        .spacing(10)
+        .into()
+}
+
+pub fn command_palette<'a, Message: Clone + ToString>(
+    content: impl Into<Element<'a, Message, Theme, Renderer>>,
+    state: &'a mut CommandPaletteState<Message>,
+    on_hide_command_palette: Message,
+) -> CommandPalette<'a, Message> {
+    CommandPalette::new(content, state, on_hide_command_palette)
+}
+
+pub struct CommandPaletteState<Message: ToString> {
+    query: String,
+    possible_results: Vec<PaletteEntry<Message>>,
+    filtered_results: Vec<PaletteEntry<Message>>,
+    selected_item: Option<String>,
 }
 
 impl<Message: ToString + Clone> CommandPaletteState<Message> {
@@ -51,7 +97,20 @@ impl<Message: ToString + Clone> CommandPaletteState<Message> {
             possible_results: results.clone(),
             filtered_results: results,
             selected_item: None,
-            has_error: false,
+        }
+    }
+
+    pub fn submitted(&self) -> PaletteEntry<Message> {
+        match &self.selected_item {
+            Some(selected) => {
+                for result in self.filtered_results.iter() {
+                    if result.inner_name() == *selected {
+                        return result.clone();
+                    }
+                }
+                panic!("Selected item was not found in filtered results")
+            }
+            None => panic!("Item was not selected before submitting"),
         }
     }
 
@@ -59,7 +118,6 @@ impl<Message: ToString + Clone> CommandPaletteState<Message> {
         self.query = String::new();
         self.filtered_results = self.possible_results.clone();
         self.selected_item = None;
-        self.has_error = false;
     }
 
     pub fn first_item(&mut self) {
@@ -125,113 +183,167 @@ impl<Message: ToString + Clone> CommandPaletteState<Message> {
     }
 }
 
-impl<Message: ToString + Clone> Default for CommandPaletteState<Message> {
-    fn default() -> Self {
-        Self::new(Vec::new(), None)
-    }
+pub struct CommandPalette<'a, Message: Clone + ToString> {
+    webview: Element<'a, Message, Theme, Renderer>,
+    state: &'a mut CommandPaletteState<Message>,
+    on_hide_command_palette: Message,
 }
 
-pub fn command_palette<'a, Message: ToString + Clone>(
-    webview: impl Into<Element<'a, Message>>,
-    state: &'a CommandPaletteState<Message>,
-    on_hide_command_pallette: Message,
-) -> Element<'a, Message> {
-    let search = container(
-        text(if state.query.is_empty() {
-            "Command Palette"
-        } else {
-            &state.query
-        })
-        .size(25),
-    )
-    .style(|theme: &Theme| container::bordered_box(theme))
-    .padding(5)
-    .width(Length::Fill);
-
-    let mut window = container(column![
-        search,
-        container(results_list(
-            state.filtered_results.as_slice(),
-            state.selected_item.clone(),
-        ))
-        .width(Length::Fill)
-        .height(Length::Fill)
-    ])
-    .padding(10)
-    .center(600);
-
-    if state.has_error {
-        window = window.style(|theme: &Theme| container::Style {
-            background: Some(theme.palette().background.into()),
-            border: border::rounded(10),
-            shadow: Shadow {
-                color: Color {
-                    r: 255.,
-                    g: 0.,
-                    b: 0.,
-                    a: 0.,
-                },
-                blur_radius: 10.,
-                ..Default::default()
-            },
-            ..container::Style::default()
-        });
-    } else {
-        window = window.style(|theme: &Theme| container::Style {
-            background: Some(theme.palette().background.into()),
-            border: border::rounded(10),
-            ..container::Style::default()
-        });
+impl<'a, Message: Clone + ToString> CommandPalette<'a, Message> {
+    pub fn new(
+        content: impl Into<Element<'a, Message, Theme, Renderer>>,
+        state: &'a mut CommandPaletteState<Message>,
+        on_hide_command_palette: Message,
+    ) -> Self {
+        CommandPalette {
+            webview: content.into(),
+            state,
+            on_hide_command_palette,
+        }
+    }
+}
+impl<Message: 'static + ToString + Clone> Widget<Message, Theme, Renderer>
+    for CommandPalette<'_, Message>
+where
+    Renderer: iced::advanced::Renderer,
+{
+    fn children(&self) -> Vec<Tree> {
+        vec![Tree::new(&self.webview)]
     }
 
-    wrapper(stack![
-        webview.into(),
-        opaque(
-            mouse_area(center(opaque(window)).style(|_theme| {
-                container::Style {
-                    background: Some(
-                        Color {
-                            a: 0.8,
-                            ..Color::BLACK
-                        }
-                        .into(),
-                    ),
-                    ..container::Style::default()
-                }
-            }))
-            .on_press(on_hide_command_pallette),
+    fn diff(&self, tree: &mut Tree) {
+        tree.diff_children(&[&self.webview]);
+    }
+
+    fn size(&self) -> Size<Length> {
+        Size::new(Length::Fill, Length::Fill)
+    }
+
+    fn layout(&self, tree: &mut Tree, renderer: &Renderer, limits: &Limits) -> Node {
+        let child_layout = self
+            .webview
+            .as_widget()
+            .layout(&mut tree.children[0], renderer, limits);
+
+        Node::with_children(child_layout.size(), vec![child_layout])
+    }
+
+    fn draw(
+        &self,
+        tree: &Tree,
+        renderer: &mut Renderer,
+        theme: &Theme,
+        style: &Style,
+        layout: Layout<'_>,
+        cursor: Cursor,
+        viewport: &Rectangle,
+    ) {
+        let search = container(text(&self.state.query).size(25))
+            .style(|theme: &Theme| container::bordered_box(theme))
+            .padding(5)
+            .width(Length::Fill);
+
+        let mut window = container(column![
+            search,
+            container(results_list(
+                self.state.filtered_results.as_slice(),
+                self.state.selected_item.clone(),
+            ))
+            .width(Length::Fill)
+            .height(Length::Fill)
+        ])
+        .padding(10)
+        .center(600);
+
+        window = window.style(|theme: &Theme| container::Style {
+            background: Some(theme.palette().background.into()),
+            border: border::rounded(10),
+            ..container::Style::default()
+        });
+
+        stack![
+            self.webview,
+            opaque(
+                mouse_area(center(opaque(window)).style(|_theme| {
+                    container::Style {
+                        background: Some(
+                            Color {
+                                a: 0.8,
+                                ..Color::BLACK
+                            }
+                            .into(),
+                        ),
+                        ..container::Style::default()
+                    }
+                }))
+                .on_press(self.on_hide_command_palette.clone()),
+            )
+        ]
+        .draw(
+            &tree.children[0],
+            renderer,
+            theme,
+            style,
+            layout.children().next().unwrap(),
+            cursor,
+            viewport,
         )
-    ])
-    // .on_keyboard_event(|event| Message::CommandPaletteKeyboardEvent(Some(event)))
-    .into()
-}
-
-fn results_list<'a, Message: ToString + 'a>(
-    results: &[PaletteEntry<Message>],
-    selected_item: Option<String>,
-) -> Element<'a, Message> {
-    let mut list = Vec::new();
-    let mut result_types = Vec::new();
-
-    for result in results {
-        if !result_types.contains(&result.to_string()) {
-            result_types.push(result.to_string());
-            list.push(text(result.to_string()).size(20).into())
-        }
-
-        let mut text = container(text(format!("   {}", result.inner_name())).size(16));
-        if let Some(selected_item) = selected_item.as_ref() {
-            if result.inner_name() == *selected_item {
-                text = text.style(|theme: &Theme| {
-                    container::Style::default().background(theme.palette().primary)
-                })
-            }
-        }
-        list.push(text.into())
     }
 
-    scrollable(Column::from_vec(list))
-        .width(Length::Fill)
-        .spacing(10)
-        .into()
+    fn on_event(
+        &mut self,
+        _tree: &mut Tree,
+        event: Event,
+        _layout: Layout<'_>,
+        _cursor: Cursor,
+        _renderer: &Renderer,
+        _clipboard: &mut dyn Clipboard,
+        _shell: &mut Shell<'_, Message>,
+        _viewport: &Rectangle,
+    ) -> Status {
+        match event {
+            Event::Keyboard(event) => match event {
+                keyboard::Event::KeyPressed {
+                    key,
+                    modified_key: _,
+                    physical_key: _,
+                    location: _,
+                    modifiers: _,
+                    text,
+                } => {
+                    if key == Key::Named(keyboard::key::Named::ArrowUp) {
+                        self.state.previous_item();
+                        Status::Captured
+                    } else if key == Key::Named(keyboard::key::Named::ArrowDown) {
+                        self.state.next_item();
+                        Status::Captured
+                    } else {
+                        if let Some(text) = text {
+                            if !text.is_empty() {
+                                self.state.query.push_str(text.as_str());
+                                return Status::Captured;
+                            }
+                            return Status::Ignored;
+                        }
+                        Status::Ignored
+                    }
+                }
+                _ => Status::Ignored,
+            },
+            Event::Mouse(_event) => Status::Ignored,
+            Event::Window(_event) => Status::Ignored,
+            Event::Touch(_event) => Status::Ignored,
+        }
+    }
+}
+
+impl<'a, Message: 'a + Clone + ToString, Theme, Renderer> From<CommandPalette<'a, Message>>
+    for Element<'a, Message, Theme, Renderer>
+where
+    Renderer: iced::advanced::Renderer,
+    CommandPalette<'a, Message>: Widget<Message, Theme, Renderer>,
+{
+    fn from(command_palette: CommandPalette<'a, Message>) -> Self {
+        Self::new(command_palette)
+    }
 }

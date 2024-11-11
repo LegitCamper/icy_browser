@@ -1,14 +1,14 @@
 // Simple keyboard driven browser using the ultralight(webkit) webengine as a backend
 
-use iced::widget::{center, container, text, Space};
+use iced::widget::{center, text};
 use iced::{event, keyboard, Element, Settings, Subscription, Task, Theme};
+use icy_browser::command_palette::PaletteEntry;
 use icy_browser::iced_webview::{
     advanced::{Action, WebView},
     Ultralight, ViewId,
 };
 use icy_browser::{
-    bookmark_bar, command_palette, get_fonts, nav_bar, tab_bar, Bookmark, CommandPaletteState,
-    Shortcut, ShortcutModifier,
+    command_palette, get_fonts, Bookmark, CommandPaletteState, Shortcut, ShortcutModifier,
 };
 use std::time::Duration;
 use strum_macros::Display;
@@ -45,7 +45,6 @@ enum Message {
     Event(event::Event),
     TitleChanged(ViewId, String),
     UrlChanged(ViewId, String),
-    InitTab, // Called after the first tab is created, to set tab to 0
     CreateTab(String),
     CreateDefaultTab,
     TabCreated(ViewId),
@@ -58,6 +57,7 @@ enum Message {
     Refresh,
     ToggleCommandPalette,
     HideCommandPalette,
+    CommandpaletteSubmitted,
 }
 
 struct Browser<'a> {
@@ -72,6 +72,14 @@ struct Browser<'a> {
 
 impl<'a> Browser<'_> {
     fn new() -> (Self, Task<Message>) {
+        let bookmarks = vec![
+            Bookmark::new("https://www.rust-lang.org", "rust-lang.org"),
+            Bookmark::new(
+                "https://github.com/LegitCamper/icy_browser",
+                "icy_browser github",
+            ),
+            Bookmark::new("https://docs.rs/iced/latest/iced/", "iced docs"),
+        ];
         (
             Browser {
                 webview: WebView::new()
@@ -80,19 +88,15 @@ impl<'a> Browser<'_> {
                     .on_create_view(Message::TabCreated),
                 tab: None,
                 tabs: Vec::new(),
-                bookmarks: vec![
-                    Bookmark::new("https://www.rust-lang.org", "rust-lang.org"),
-                    Bookmark::new(
-                        "https://github.com/LegitCamper/icy_browser",
-                        "icy_browser github",
-                    ),
-                    Bookmark::new("https://docs.rs/iced/latest/iced/", "iced docs"),
-                ],
+                bookmarks: bookmarks.clone(),
                 shortcuts: vec![
                     Shortcut::new(Message::CreateDefaultTab, ShortcutModifier::Ctrl, "t"),
                     Shortcut::new(Message::ToggleCommandPalette, ShortcutModifier::Ctrl, "e"),
                 ],
-                command_palette_state: CommandPaletteState::default(),
+                command_palette_state: CommandPaletteState::new(
+                    vec![Message::HideCommandPalette, Message::GoForward],
+                    Some(bookmarks),
+                ),
                 show_palette: false,
             },
             Task::done(Message::CreateTab(HOME.to_string())),
@@ -127,7 +131,6 @@ impl<'a> Browser<'_> {
                     });
                 }
             }
-            Message::InitTab => self.tab = Some(0),
             Message::CreateDefaultTab => return Task::done(Message::CreateTab(HOME.to_string())),
             Message::CreateTab(url) => {
                 return self
@@ -169,6 +172,16 @@ impl<'a> Browser<'_> {
                 },
                 _ => (),
             },
+            Message::CommandpaletteSubmitted => {
+                match self.command_palette_state.submitted() {
+                    PaletteEntry::Command(action) => return Task::done(action),
+                    PaletteEntry::Bookmark(bookmark) => {
+                        return Task::done(Message::Gotourl(bookmark.url().to_string()))
+                    }
+                    PaletteEntry::Tab(url, title) => todo!(), // self.tab = Some(),
+                    PaletteEntry::None => (),
+                }
+            }
         }
         Task::none()
     }
@@ -179,7 +192,7 @@ impl<'a> Browser<'_> {
             if self.show_palette {
                 command_palette(
                     webview,
-                    &self.command_palette_state,
+                    &mut self.command_palette_state,
                     Message::HideCommandPalette,
                 )
             } else {
